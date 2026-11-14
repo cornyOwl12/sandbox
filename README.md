@@ -13,4 +13,4 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🧦 Lost Sock Office | Memory match: reunite the pairs |
 | 🥧 Tulip PIE Bakery | Pie Tycoon: bake pies and hire helpers |
 
-Everything lives in a single `index.html`. Pushing to `main` deploys it to GitHub Pages.
+Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.
