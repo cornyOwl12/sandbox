@@ -274,6 +274,7 @@
   .kp-grid button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
   .kp-msg { margin-top: 8px; font-size: 13px; min-height: 1.2em; }
   .kp-x { position: absolute; top: 6px; right: 6px; background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; }
+  .dtool.on { background: #8fd3ff; box-shadow: 0 3px 0 var(--ink), inset 0 0 0 2px #1f5fbf; }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -1830,6 +1831,121 @@ const games = {
     });
     return () => timers.forEach(t => { clearTimeout(t); clearInterval(t); });
   }},
+  /* 🦷 Dentist Office */
+  dentist: { title: '🦷 Dr. Molar\'s Dentist Office: Tooth Trouble', start(el) {
+    const tools = [['tweezers', '🥢', 'Tweezers', 'pull stuck stuff out (hold)'], ['drill', '⚙️', 'Drill', 'fix black cavities (hold)'], ['brush', '🪥', 'Brush', 'scrub yellow plaque (rub back and forth)']];
+    const junk = ['🥬', '🍿', '🦐', '🧦', '🔑', '🦆', '🪙', '🐸', '🍝', '🧀', '📎', '🐟', '🌽', '🎲', '🐛', '🥄'];
+    const patients = [['🦛', 'Hector Hippo'], ['🐊', 'Chompy'], ['🦈', 'Bruce'], ['👵', 'Granny Grumbles (yikes)'], ['🦁', 'Leo'], ['🐴', 'Sir Neighs-a-Lot'], ['🐻', 'Big Ted'], ['🧟', 'Couch Kevin'], ['🦖', 'Rexy'], ['🐼', 'Coach Bao Bao']];
+    el.innerHTML = `<p class="hint">Patients keep showing up with gross stuff in their teeth! Pick the right tool, then click and <b>hold</b> on the problem. The brush needs scrubbing back and forth. Wrong tool = <b>OUCH</b>. Too many ouches and they run away! 60 seconds.</p>
+      <div class="stats"><span id="dpt"></span><span id="dhap">😁 Happy patients: 0</span><span id="dtm">⏱ 60</span></div>
+      <canvas class="game" width="480" height="330" style="cursor:pointer;touch-action:none"></canvas>
+      <div class="row" id="dtools">${tools.map(([k, e, n, d], i) => `<button class="btn dtool${i === 0 ? ' on' : ''}" data-tool="${k}" title="${d}">${e} ${n}</button>`).join('')}</div>
+      <p class="msg" id="dmsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    // tooth layout: 8 upper, 8 lower
+    const teeth = [];
+    for (let i = 0; i < 8; i++) { const x = 92 + i * 42; teeth.push({ x, y: 128 + Math.abs(i - 3.5) * 5, up: true }); }
+    for (let i = 0; i < 8; i++) { const x = 92 + i * 42; teeth.push({ x, y: 232 - Math.abs(i - 3.5) * 5, up: false }); }
+    let tool = 'tweezers', probs, patient, ouch, happy, time, over, raf, last, hold = null, pops, nextT, ran;
+    function newPatient() {
+      patient = pick(patients); ouch = 0; probs = []; nextT = 0;
+      const n = Math.floor(rand(3, 6)), used = new Set();
+      while (probs.length < n) {
+        const ti = Math.floor(rand(0, 16)); if (used.has(ti)) continue; used.add(ti);
+        const r = Math.random();
+        probs.push({ ti, type: r < .5 ? 'stuck' : r < .78 ? 'cavity' : 'plaque', item: pick(junk), p: 0 });
+      }
+      $('#dpt', el).textContent = `${patient[0]} ${patient[1]}`;
+    }
+    function reset() { happy = 0; ran = 0; time = 60; over = false; pops = []; last = performance.now(); $('#dmsg', el).textContent = ''; newPatient(); }
+    const need = { stuck: 'tweezers', cavity: 'drill', plaque: 'brush' };
+    $('#dtools', el).addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (!b) return; el.querySelectorAll('.dtool').forEach(x => x.classList.remove('on')); b.classList.add('on'); tool = b.dataset.tool; });
+    const probAt = p => probs.find(pr => pr.p < 1 && Math.hypot(teeth[pr.ti].x - p.x, teeth[pr.ti].y - p.y) < 24);
+    c.addEventListener('pointerdown', e => {
+      if (over) { reset(); return; }
+      c.setPointerCapture(e.pointerId);
+      const p = canvasPos(c, e), pr = probAt(p);
+      if (!pr) return;
+      if (need[pr.type] !== tool) {
+        ouch += .26; pops.push({ x: p.x, y: p.y - 10, t: .9, txt: pick(['OUCH!', 'OWW!', 'YEEOW!', 'Hey!!']), col: '#c4182f' });
+        $('#dmsg', el).textContent = `Wrong tool! Try the ${tools.find(t => t[0] === need[pr.type]).slice(1, 3).join(' ')} on that one.`;
+        return;
+      }
+      hold = { pr, p, lastP: p };
+    });
+    c.addEventListener('pointermove', e => { if (hold) { const p = canvasPos(c, e); hold.moved = (hold.moved || 0) + Math.hypot(p.x - hold.lastP.x, p.y - hold.lastP.y); hold.lastP = p; hold.p = p; } });
+    const up = () => hold = null; c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (!over) {
+        time -= dt;
+        if (hold && hold.pr.p < 1) {
+          const pr = hold.pr;
+          if (Math.hypot(teeth[pr.ti].x - hold.p.x, teeth[pr.ti].y - hold.p.y) > 34) hold = null;
+          else {
+            if (pr.type === 'stuck') pr.p += dt / .7;
+            if (pr.type === 'cavity') pr.p += dt / 1.1;
+            if (pr.type === 'plaque') { pr.p += (hold.moved || 0) / 260; hold.moved = 0; }
+            if (pr.p >= 1) {
+              pr.p = 1; hold = null;
+              pops.push({ x: teeth[pr.ti].x, y: teeth[pr.ti].y - 20, t: 1, txt: pr.type === 'stuck' ? `${pr.item} yoink!` : pr.type === 'cavity' ? 'Fixed!' : '✨ Shiny!', col: '#2b1d3a' });
+              if (pr.type === 'stuck') pops.push({ x: teeth[pr.ti].x, y: teeth[pr.ti].y, t: 1.2, txt: pr.item, col: '#000', fly: true });
+            }
+          }
+        }
+        ouch = Math.max(0, ouch - dt * .03);
+        if (ouch >= 1) {
+          ran++; $('#dmsg', el).textContent = `😱 ${patient[1]} ran out screaming! Be gentler with the next one.`; newPatient();
+        } else if (probs.every(pr => pr.p >= 1)) {
+          nextT += dt;
+          if (nextT > .8) { happy++; $('#dmsg', el).textContent = `😁 ${patient[1]}: "${pick(['My teeth have never been so sparkly!', 'Wow, I found my lost sock!', 'I can chew again!', 'Best. Dentist. Ever.'])}"`; newPatient(); }
+        }
+        if (time <= 0) {
+          time = 0; over = true;
+          $('#dmsg', el).textContent = `🦷 Office closed! ${happy} happy patient${happy === 1 ? '' : 's'}${ran ? `, ${ran} ran away` : ''}. ${happy >= 8 ? 'Dr. Molar says you\'re a TOOTH WIZARD!' : 'Click the mouth to open again!'}`;
+        }
+      }
+      // draw
+      ctx.fillStyle = '#d9f0ec'; ctx.fillRect(0, 0, 480, 330);
+      ctx.fillStyle = '#f4c7a5'; ctx.beginPath(); ctx.ellipse(240, 182, 230, 160, 0, 0, Math.PI * 2); ctx.fill();
+      // mouth
+      ctx.fillStyle = '#c94a5a'; ctx.beginPath(); ctx.ellipse(240, 182, 205, 118, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#5a1420'; ctx.beginPath(); ctx.ellipse(240, 182, 180, 78, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8707e'; ctx.beginPath(); ctx.ellipse(240, 210, 90, 30, 0, 0, Math.PI * 2); ctx.fill();
+      // teeth
+      teeth.forEach((th, i) => {
+        const pr = probs.find(p => p.ti === i);
+        let col = '#fffdf6';
+        if (pr && pr.type === 'plaque' && pr.p < 1) col = `rgb(${235 - 10 * (1 - pr.p)},${215 + 30 * pr.p},${120 + 120 * pr.p})`;
+        ctx.fillStyle = col; ctx.strokeStyle = '#c9bfae'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(th.x - 18, th.y - 22, 36, 44, th.up ? [4, 4, 14, 14] : [14, 14, 4, 4]) : ctx.rect(th.x - 18, th.y - 22, 36, 44); ctx.fill(); ctx.stroke();
+        if (pr && pr.p >= 1) { ctx.fillStyle = '#fff'; ctx.font = '12px serif'; ctx.textAlign = 'center'; ctx.fillText('✨', th.x + 11, th.y - 10); }
+        if (!pr || pr.p >= 1) return;
+        if (pr.type === 'cavity') { ctx.fillStyle = `rgba(30,20,20,${1 - pr.p * .9})`; ctx.beginPath(); ctx.arc(th.x, th.y, 9 * (1 - pr.p * .7), 0, Math.PI * 2); ctx.fill(); }
+        if (pr.type === 'stuck') {
+          const wig = hold && hold.pr === pr ? Math.sin(t / 30) * 4 : 0;
+          ctx.save(); ctx.translate(th.x + 20 + wig, th.y + (th.up ? 8 : -8) - pr.p * 14 * (th.up ? -1 : 1)); ctx.rotate(.4);
+          ctx.font = '24px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(pr.item, 0, 0); ctx.restore(); ctx.textBaseline = 'alphabetic';
+        }
+        if (pr.type === 'plaque' && hold && hold.pr === pr) { ctx.font = '18px serif'; ctx.textAlign = 'center'; ctx.fillText('🫧', th.x + rand(-10, 10), th.y + rand(-12, 12)); }
+        if (pr.p > 0) { ctx.fillStyle = '#2b1d3a'; ctx.fillRect(th.x - 16, th.up ? th.y + 26 : th.y - 32, 32, 5); ctx.fillStyle = '#3fb54a'; ctx.fillRect(th.x - 16, th.up ? th.y + 26 : th.y - 32, 32 * pr.p, 5); }
+      });
+      // tool cursor
+      if (hold) { ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.fillText(tools.find(x => x[0] === tool)[1], hold.p.x + 14 + (tool === 'drill' ? rand(-2, 2) : 0), hold.p.y - 14); }
+      // ouch meter
+      ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 12px Trebuchet MS'; ctx.textAlign = 'left'; ctx.fillText('😬 Ouch meter', 10, 18);
+      ctx.fillStyle = '#fff'; ctx.fillRect(10, 24, 110, 10); ctx.fillStyle = ouch > .7 ? '#e8364f' : '#ff9f43'; ctx.fillRect(10, 24, 110 * Math.min(1, ouch), 10);
+      ctx.strokeStyle = '#2b1d3a'; ctx.lineWidth = 1.5; ctx.strokeRect(10, 24, 110, 10);
+      ctx.font = '40px serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(patient[0], 470, 6); ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'center';
+      pops.forEach(p => { p.t -= dt; p.y -= (p.fly ? 90 : 30) * dt; if (p.fly) p.x += 120 * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.fillStyle = p.col; ctx.font = p.fly ? '26px serif' : 'bold 15px Trebuchet MS'; ctx.fillText(p.txt, p.x, p.y); ctx.globalAlpha = 1; });
+      pops = pops.filter(p => p.t > 0);
+      $('#dhap', el).textContent = '😁 Happy patients: ' + happy; $('#dtm', el).textContent = '⏱ ' + Math.ceil(time);
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
     el.innerHTML = `<p class="hint">Help the cheese 🧀 ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
@@ -2086,12 +2202,13 @@ const places = [
     wall: 'repeating-linear-gradient(90deg, #f6f0ff 0 22px, #ddd0f2 22px 30px)', emoji: '🖍️', name: 'Museum of Crayons', tag: 'Draw a Masterpiece' },
   { key: 'hats', x: 985, y: 245, w: 175, h: 143, roofH: 30, style: 'flat', roof: '#22223a', wall: '#ffd1dc', emoji: '🎩', name: 'Hats Hats Hats', tag: 'Hat Rush' },
   { key: 'lemonade', x: 410, y: 548, w: 132, h: 112, roofH: 32, style: 'awning', stripes: true, roof: '#ffcc1f', wall: '#c98d4f', windows: false, emoji: '🍋', size: 40, name: "Lulu's Lemonade", tag: 'Lemonade Rush' },
-  { key: 'couch', x: 665, y: 514, w: 270, h: 150, roofH: 48, tower: true, roof: '#2f7d3a', wall: '#f3e2c4', emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker' },
+  { key: 'couch', x: 660, y: 514, w: 192, h: 150, roofH: 48, tower: true, roof: '#2f7d3a', wall: '#f3e2c4', emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker' },
   { key: 'nails', x: 985, y: 520, w: 180, h: 144, roofH: 36, style: 'awning', stripes: true, roof: '#ff7fae', wall: '#ffe3f1', emoji: '💅', name: 'Glitter Claws Nails', tag: 'Polish Panic' },
   { key: 'checkers', x: 678, y: 762, w: 150, h: 108, roofH: 38, roof: '#22223a', wall: 'repeating-conic-gradient(#fff 0 25%, #f3c4c4 0 50%) 0 0/24px 24px', emoji: '🔴⚫', size: 26, name: 'Checkers Club', tag: 'Checkers Match' },
   { key: 'zombies', x: 70, y: 62, w: 190, h: 143, roofH: 50, roof: '#3b2a4d', wall: '#7d8a76', win: '#a6ff8f', emoji: '🧟', size: 40, name: 'Chill Zombie Manor', tag: 'Explore' },
   { key: 'casino', x: 1010, y: 760, w: 172, h: 112, roofH: 36, style: 'flat', roof: 'linear-gradient(90deg,#2f9e44,#ffd84a,#2f9e44)', wall: '#1f4d2e', win: '#9dff8a', emoji: '🍀🎰', size: 34, name: 'Lucky Clover Casino', tag: '🔒 Locked' },
   { key: 'gym', x: 424, y: 244, w: 128, h: 144, roofH: 40, style: 'flat', roof: '#222', wall: 'linear-gradient(#ffffff 0 55%, #1d1d1d 55%)', emoji: '🐼', size: 40, name: 'Panda Gym', tag: 'Bamboo Workout' },
+  { key: 'dentist', x: 866, y: 528, w: 108, h: 136, roofH: 36, roof: '#3aa0f0', wall: '#e9f7ff', emoji: '🦷', size: 36, name: 'Dentist', tag: 'Tooth Trouble' },
   { key: 'penny', x: 300, y: 762, w: 190, h: 108, roofH: 38, roof: '#b8692e', wall: '#f6d9b8', emoji: '🪙', size: 34, name: 'The Penny House', tag: 'Penny Press' },
   { key: 'socks', x: 60, y: 762, w: 200, h: 108, roofH: 38, roof: '#3aa0f0', wall: '#e6f4ff', emoji: '🧦', size: 34, name: 'Lost Sock Office', tag: 'Match the Pairs' },
 ];
