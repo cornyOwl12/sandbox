@@ -189,6 +189,9 @@
   .skin span { font-size: 32px; } .skin small { font-size: 10px; font-weight: bold; }
   .skin.rare { background: #e3f1ff; } .skin.legendary { background: #fff1c2; } .skin.unowned { opacity: .5; cursor: default; }
   .skin.on { outline: 3px solid #e8364f; outline-offset: 2px; }
+  .orchard { background: #8fd06a; border-color: #8a5a3b; }
+  .otree { position: absolute; font-size: 38px; line-height: 1; }
+  .otree i { position: absolute; font-style: normal; font-size: 14px; left: 14px; top: 16px; transform: rotate(20deg); }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -208,7 +211,7 @@
 <canvas id="fx"></canvas>
 <div id="scene">
   <div class="sky" id="sky"></div>
-  <span class="moon" style="left:300px">🌙</span>
+  <span class="moon" style="left:1140px;top:14px;font-size:36px">🌙</span>
   <svg class="hills" viewBox="0 0 1200 80" preserveAspectRatio="none">
     <path d="M0 60 Q150 0 300 45 T600 40 T900 30 T1200 50 V80 H0Z" fill="#4f8f4a"/>
     <path d="M0 70 Q200 30 400 62 T800 55 T1200 62 V80 H0Z" fill="#5fa653"/>
@@ -1150,6 +1153,99 @@ const games = {
     renderWard();
     return () => timers.forEach(t => { clearInterval(t); clearTimeout(t); });
   }},
+  /* 🥄 Spoon Orchard */
+  orchard: { title: '🥄 Spoon Orchard: Spoon Harvest', start(el) {
+    el.innerHTML = `<p class="hint">Spoons grow on trees here (obviously). Click spoons when they're <b>shiny and ripe</b> ✨. Unripe ones are dull and small. Golden spoons are worth 5! But don't pick the <b>forks</b>. They're imposters. 45 seconds!</p>
+      <div class="stats"><span id="osc">🧺 Spoons: 0</span><span id="odrop">Dropped: 0</span><span id="otm">⏱ 45</span></div>
+      <canvas class="game" width="480" height="320" style="cursor:pointer"></canvas><p class="msg" id="omsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const trees = [{ x: 95, y: 120 }, { x: 240, y: 100 }, { x: 385, y: 120 }];
+    const slots = [];
+    trees.forEach(t => [[-45, -15], [-20, -45], [15, -50], [45, -20], [-35, 20], [0, 0], [38, 22], [-5, 40]].forEach(([dx, dy]) => slots.push({ x: t.x + dx, y: t.y + dy, s: null })));
+    let score, dropped, time, over, raf, last, falling, pops, spawnT;
+    function reset() { slots.forEach(s => s.s = null); score = 0; dropped = 0; time = 45; over = false; falling = []; pops = []; spawnT = 0; last = performance.now(); $('#omsg', el).textContent = ''; }
+    function say(x, y, txt, col) { pops.push({ x, y, txt, col, t: 1 }); }
+    c.addEventListener('pointerdown', e => {
+      if (over) { reset(); return; }
+      const p = canvasPos(c, e);
+      let hit = null, bd = 22;
+      for (const sl of slots) if (sl.s) { const d = Math.hypot(sl.x - p.x, sl.y + 6 - p.y); if (d < bd) { bd = d; hit = sl; } }
+      if (!hit) return;
+      const sp = hit.s;
+      if (sp.kind === 'fork') { score = Math.max(0, score - 2); say(hit.x, hit.y, "That's a FORK! -2", '#c4182f'); hit.s = null; }
+      else if (sp.phase === 'grow') { say(hit.x, hit.y, 'Not ripe yet!', '#555'); }
+      else { const v = sp.kind === 'gold' ? 5 : 1; score += v; say(hit.x, hit.y, v === 5 ? '✨ GOLDEN +5!' : '+1 🥄', v === 5 ? '#b8860b' : '#2b1d3a'); hit.s = null; }
+    });
+    function drawSpoon(x, y, rot, scale, kind, phase, t) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(scale, scale);
+      const metal = kind === 'gold' ? ['#ffe27a', '#c9971a'] : phase === 'grow' ? ['#b9bcc4', '#8d9099'] : ['#ffffff', '#a9b1c2'];
+      const g = ctx.createLinearGradient(-8, -20, 8, 20); g.addColorStop(0, metal[0]); g.addColorStop(1, metal[1]);
+      ctx.fillStyle = g; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-2, -2, 4, 24, 2) : ctx.rect(-2, -2, 4, 24); ctx.fill(); ctx.stroke();
+      if (kind === 'fork') {
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-7, -8, 14, 8, 3) : ctx.rect(-7, -8, 14, 8); ctx.fill(); ctx.stroke();
+        for (let i = -6; i <= 4; i += 3.4) { ctx.beginPath(); ctx.rect(i, -20, 2.2, 13); ctx.fill(); ctx.stroke(); }
+      } else { ctx.beginPath(); ctx.ellipse(0, -10, 7.5, 10.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      ctx.restore();
+      if (phase === 'ripe' && kind !== 'fork') {
+        ctx.fillStyle = kind === 'gold' ? '#ffd84a' : '#fff';
+        const tw = (Math.sin(t / 150 + x) + 1) / 2;
+        ctx.globalAlpha = .5 + tw * .5; ctx.font = `${10 + tw * 6}px serif`; ctx.textAlign = 'center'; ctx.fillText('✨', x + 10, y - 14); ctx.globalAlpha = 1;
+      }
+    }
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (!over) {
+        time -= dt; spawnT -= dt;
+        if (spawnT <= 0) {
+          spawnT = rand(.25, .6);
+          const empty = slots.filter(s => !s.s);
+          if (empty.length) {
+            const r = Math.random();
+            pick(empty).s = { kind: r < .07 ? 'gold' : r < .22 ? 'fork' : 'spoon', phase: 'grow', t: rand(1.2, 2.4), rot: rand(-.5, .5) };
+          }
+        }
+        for (const sl of slots) {
+          const sp = sl.s; if (!sp) continue;
+          sp.t -= dt;
+          if (sp.t <= 0) {
+            if (sp.phase === 'grow') { sp.phase = 'ripe'; sp.t = sp.kind === 'gold' ? 1.4 : sp.kind === 'fork' ? 3 : 2.3; }
+            else { if (sp.kind !== 'fork') dropped++; falling.push({ x: sl.x, y: sl.y, vy: 0, rot: sp.rot, kind: sp.kind }); sl.s = null; }
+          }
+        }
+        if (time <= 0) {
+          time = 0; over = true;
+          $('#omsg', el).textContent = score >= 25 ? `🏆 Master Spoon Farmer! ${score} spoons harvested! Click to harvest again.` : `You harvested ${score} spoons (${dropped} fell). Click the orchard to go again!`;
+        }
+      }
+      falling.forEach(f => { f.vy += 600 * dt; f.y += f.vy * dt; f.rot += dt * 6; });
+      falling = falling.filter(f => f.y < 300);
+      // scene
+      const sky = ctx.createLinearGradient(0, 0, 0, 320); sky.addColorStop(0, '#9fdcff'); sky.addColorStop(1, '#e8f7ff');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, 480, 320);
+      ctx.fillStyle = '#7cc46a'; ctx.fillRect(0, 240, 480, 80);
+      ctx.fillStyle = '#6aae58'; for (let i = 0; i < 30; i++) ctx.fillRect((i * 67) % 480, 248 + (i * 13) % 60, 3, 7);
+      for (const tr of trees) {
+        ctx.fillStyle = '#7a4a26'; ctx.fillRect(tr.x - 10, tr.y + 30, 20, 115);
+        ctx.fillStyle = '#3f9a45';
+        [[0, 0, 70], [-40, 10, 45], [40, 10, 45], [0, -35, 50]].forEach(([dx, dy, r]) => { ctx.beginPath(); ctx.arc(tr.x + dx, tr.y + dy, r, 0, Math.PI * 2); ctx.fill(); });
+        ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.beginPath(); ctx.arc(tr.x - 20, tr.y - 25, 30, 0, Math.PI * 2); ctx.fill();
+      }
+      for (const sl of slots) if (sl.s) {
+        const sp = sl.s, sway = Math.sin(t / 500 + sl.x) * .12;
+        drawSpoon(sl.x, sl.y, sp.rot + sway, sp.phase === 'grow' ? .6 + (1 - Math.max(0, sp.t) / 2.4) * .2 : 1, sp.kind, sp.phase, t);
+      }
+      falling.forEach(f => drawSpoon(f.x, f.y, f.rot, 1, f.kind, 'ripe', t));
+      ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🧺', 240, 285); ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 14px Trebuchet MS'; ctx.fillText(score, 240, 290);
+      pops.forEach(p => { p.t -= dt; p.y -= 30 * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.fillStyle = p.col; ctx.font = 'bold 15px Trebuchet MS'; ctx.fillText(p.txt, p.x, p.y - 20); ctx.globalAlpha = 1; });
+      pops = pops.filter(p => p.t > 0);
+      $('#osc', el).textContent = '🧺 Spoons: ' + score; $('#odrop', el).textContent = 'Dropped: ' + dropped; $('#otm', el).textContent = '⏱ ' + Math.ceil(time);
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
     el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
@@ -1420,6 +1516,15 @@ setTimeout(updateHud);
 // the mountain on the horizon
 add(`<div class="mountain" data-key="mountain" style="left:880px;top:30px;width:250px;height:175px">
   <div class="peak"></div><span class="trike">🚲</span><span class="sign">⛰️ Mount Wobblemore</span><span class="play-tag">🎮 Trike Climb</span>
+</div>`);
+
+// spoon orchard on the hill
+add(`<div class="paddock orchard" data-key="orchard" style="left:282px;top:104px;width:140px;height:101px">
+  <span class="sign" style="top:-16px">🥄 Spoon Orchard</span>
+  <span class="otree" style="left:6px;top:14px">🌳<i>🥄</i></span>
+  <span class="otree" style="left:48px;top:4px">🌳<i>🥄</i></span>
+  <span class="otree" style="left:90px;top:14px">🌳<i>🥄</i></span>
+  <span class="play-tag" style="bottom:-12px">🎮 Spoon Harvest</span>
 </div>`);
 
 // horse paddock (part of the stables)

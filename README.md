@@ -17,6 +17,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🔴 Checkers Club | Checkers Match vs. Professor Hoot 🦉 |
 | 🦆 Duck Pond | Feed the Ducks before Gerald the goose steals the bread |
 | 🧟 Chill Zombie Manor | Explore a house of chill zombies. Avoid Granny Grumbles 👵 (and find the key 🔑) |
+| 🥄 Spoon Orchard | Spoon Harvest: pick ripe spoons, grab golden ones, avoid the forks |
 | 🎰 Lucky Clover Casino | Locked until you find the key. Spend race coins on skin slots, then pick a skin in the wardrobe |
 
 Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.
