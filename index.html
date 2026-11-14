@@ -226,6 +226,7 @@
   .namebox { font: inherit; padding: 7px 10px; border: 2px solid var(--ink); border-radius: 10px; width: 150px; }
   #rec.recording { background: #ff8a8a; animation: twinkle 1s infinite; }
   .songs { display: grid; gap: 6px; }
+  .micbox { display: flex; align-items: center; gap: 5px; font-weight: bold; background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 6px 10px; cursor: pointer; }
   .tp-ctrl { display: flex; justify-content: center; gap: 2px; margin-top: 2px; }
   .tp-ctrl button { font: inherit; font-size: 9px; line-height: 1; padding: 2px 3px; border: 1.5px solid var(--ink); border-radius: 5px; background: #ffe27a; cursor: pointer; }
   .tp-ctrl button.on { background: #ff8a8a; animation: twinkle 1s infinite; }
@@ -1571,9 +1572,18 @@ const games = {
     const label = {}; Object.entries(keyToMidi).forEach(([k, m]) => label[m] = k.toUpperCase());
     const demo = { name: 'Twinkle Twinkle (demo)', demo: true, notes: [60, 60, 67, 67, 69, 69, 67, -1, 65, 65, 64, 64, 62, 62, 60].map((m, i) => [m, i * 420]).filter(n => n[0] > 0) };
     let songs = []; try { songs = JSON.parse(localStorage.getItem('tulipPIE_songs') || '[]'); } catch (e) {}
+    // voice clips are stored in IndexedDB (too big for localStorage)
+    const vdb = (() => {
+      let dbp = null;
+      const open = () => dbp || (dbp = new Promise((res, rej) => { const r = indexedDB.open('tulipPIE_voice', 1); r.onupgradeneeded = () => r.result.createObjectStore('clips'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }));
+      const tx = (mode, fn) => open().then(db => new Promise((res, rej) => { const t = db.transaction('clips', mode), q = fn(t.objectStore('clips')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }));
+      return { put: (k, b) => tx('readwrite', s => s.put(b, k)), get: k => tx('readonly', s => s.get(k)), del: k => tx('readwrite', s => s.delete(k)) };
+    })();
+    let micStream = null, mediaRec = null, voicePlayer = null;
     el.innerHTML = `<p class="hint">Click the keys or use your keyboard (letters are on the keys). Hit <b>⏺ Record</b>, play something, then <b>⏹ Stop</b> and save it!</p>
       <div class="bigkeys" id="bk"></div>
       <div class="row">
+        <label class="micbox"><input type="checkbox" id="mic"> 🎤 Record my voice too</label>
         <button class="btn" id="rec">⏺ Record</button>
         <button class="btn" id="playTake" disabled>▶ Play recording</button>
         <input id="songName" class="namebox" maxlength="30" placeholder="Song name…">
@@ -1598,28 +1608,60 @@ const games = {
       const m = keyToMidi[e.key.toLowerCase()]; if (m) { e.preventDefault(); hit(m, true); }
     };
     document.addEventListener('keydown', kd);
-    function stopPlayback() { timers.forEach(clearTimeout); timers = []; }
-    function playSong(notes, who) {
+    function stopPlayback() { timers.forEach(clearTimeout); timers = []; if (voicePlayer) { voicePlayer.pause(); voicePlayer = null; } }
+    function playSong(notes, who, voice) {
       stopPlayback();
-      $('#pmsg', el).textContent = `🎶 Playing ${who}…`;
-      const t0 = notes.length ? notes[0][1] : 0;
+      $('#pmsg', el).textContent = `🎶 Playing ${who}${voice ? ' 🎤' : ''}…`;
+      // with a voice clip, notes keep their real timing so they line up with the recording
+      const t0 = voice || !notes.length ? 0 : notes[0][1];
+      if (voice) { voicePlayer = new Audio(URL.createObjectURL(voice)); voicePlayer.play().catch(() => {}); }
       notes.forEach(([m, t]) => timers.push(setTimeout(() => hit(m, false), t - t0)));
-      const end = notes.length ? notes[notes.length - 1][1] - t0 + 600 : 0;
-      timers.push(setTimeout(() => $('#pmsg', el).textContent = '', end));
+      const end = Math.max(notes.length ? notes[notes.length - 1][1] - t0 + 600 : 0, voice ? 1000 : 0);
+      if (voicePlayer) voicePlayer.onended = () => $('#pmsg', el).textContent = '';
+      else timers.push(setTimeout(() => $('#pmsg', el).textContent = '', end));
     }
-    $('#rec', el).addEventListener('click', () => {
-      if (!rec) { stopPlayback(); rec = { start: performance.now(), notes: [] }; $('#rec', el).textContent = '⏹ Stop'; $('#rec', el).classList.add('recording'); $('#pmsg', el).textContent = '🔴 Recording… play something!'; }
-      else {
+    let takeVoice = null, starting = false;
+    function beginRec(withMic) {
+      rec = { start: performance.now(), notes: [] };
+      $('#rec', el).textContent = '⏹ Stop'; $('#rec', el).classList.add('recording');
+      $('#pmsg', el).textContent = withMic ? '🔴 Recording keys + your voice… sing along! 🎤' : '🔴 Recording… play something!';
+    }
+    $('#rec', el).addEventListener('click', async () => {
+      if (starting) return;
+      if (!rec) {
+        stopPlayback(); takeVoice = null;
+        if ($('#mic', el).checked) {
+          starting = true; $('#pmsg', el).textContent = '🎤 Asking for your microphone…';
+          try {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+            const chunks = [];
+            mediaRec = new MediaRecorder(micStream);
+            mediaRec.ondataavailable = e => e.data.size && chunks.push(e.data);
+            mediaRec.onstop = () => { takeVoice = chunks.length ? new Blob(chunks, { type: mediaRec.mimeType || 'audio/webm' }) : null; micStream.getTracks().forEach(t => t.stop()); micStream = null; };
+            mediaRec.onstart = () => beginRec(true);
+            mediaRec.start();
+          } catch (err) {
+            $('#pmsg', el).textContent = "🎤 Couldn't use the microphone (permission blocked?). Recording keys only."; beginRec(false);
+          }
+          starting = false;
+        } else beginRec(false);
+      } else {
         take = rec.notes; rec = null; $('#rec', el).textContent = '⏺ Record'; $('#rec', el).classList.remove('recording');
-        $('#pmsg', el).textContent = take.length ? `Recorded ${take.length} notes. Give it a name and save it!` : 'Nothing recorded. Play some keys while recording!';
-        $('#playTake', el).disabled = $('#saveSong', el).disabled = !take.length;
+        const hadMic = mediaRec && mediaRec.state === 'recording';
+        if (hadMic) { await new Promise(r => { const old = mediaRec.onstop; mediaRec.onstop = () => { old(); r(); }; mediaRec.stop(); }); }
+        mediaRec = null;
+        const has = take.length || takeVoice;
+        $('#pmsg', el).textContent = has ? `Recorded ${take.length} notes${takeVoice ? ' + your voice 🎤' : ''}. Give it a name and save it!` : 'Nothing recorded. Play some keys while recording!';
+        $('#playTake', el).disabled = $('#saveSong', el).disabled = !has;
       }
     });
-    $('#playTake', el).addEventListener('click', () => take && playSong(take, 'your recording'));
-    $('#saveSong', el).addEventListener('click', () => {
-      if (!take || !take.length) return;
+    $('#playTake', el).addEventListener('click', () => (take && (take.length || takeVoice)) && playSong(take, 'your recording', takeVoice));
+    $('#saveSong', el).addEventListener('click', async () => {
+      if (!take || !(take.length || takeVoice)) return;
       const name = $('#songName', el).value.trim() || `Song #${songs.length + 1}`;
-      songs.unshift({ name, notes: take });
+      const song = { name, notes: take, id: Date.now() + '-' + Math.floor(Math.random() * 1e6) };
+      if (takeVoice) { try { await vdb.put(song.id, takeVoice); song.voice = true; } catch (e) { $('#pmsg', el).textContent = 'Could not save the voice part, saving notes only.'; } }
+      songs.unshift(song); takeVoice = null;
       try { localStorage.setItem('tulipPIE_songs', JSON.stringify(songs)); } catch (e) { $('#pmsg', el).textContent = 'Could not save (storage full?)'; return; }
       $('#pmsg', el).textContent = `💾 Saved "${name}"!`; $('#songName', el).value = ''; take = null;
       $('#playTake', el).disabled = $('#saveSong', el).disabled = true;
@@ -1627,22 +1669,28 @@ const games = {
     });
     function renderSongs() {
       const list = [...songs, demo];
-      $('#songs', el).innerHTML = list.map((s, i) => `<div class="song"><span>🎵 <b>${s.name.replace(/[<>&]/g, '')}</b> <small>(${s.notes.length} notes)</small></span>
+      $('#songs', el).innerHTML = list.map((s, i) => `<div class="song"><span>🎵 <b>${s.name.replace(/[<>&]/g, '')}</b> <small>(${s.notes.length} notes${s.voice ? ' + 🎤 voice' : ''})</small></span>
         <span><button class="btn" data-play="${i}">▶ Play</button>${s.demo ? '' : ` <button class="btn del" data-del="${i}">🗑</button>`}</span></div>`).join('');
       $('#songs', el).dataset.count = list.length;
       $('#songs', el)._list = list;
     }
     $('#songs', el).addEventListener('click', e => {
       const list = $('#songs', el)._list;
-      const p = e.target.closest('[data-play]'); if (p) { const s = list[+p.dataset.play]; playSong(s.notes, `"${s.name}"`); return; }
+      const p = e.target.closest('[data-play]');
+      if (p) { const s = list[+p.dataset.play]; if (s.voice) vdb.get(s.id).then(b => playSong(s.notes, `"${s.name}"`, b || null)).catch(() => playSong(s.notes, `"${s.name}"`)); else playSong(s.notes, `"${s.name}"`); return; }
       const d = e.target.closest('[data-del]'); if (!d) return;
       if (!d.classList.contains('confirm')) { d.classList.add('confirm'); d.textContent = 'Delete? 🗑'; setTimeout(() => { if (d.isConnected) { d.classList.remove('confirm'); d.textContent = '🗑'; } }, 3000); return; }
-      songs.splice(+d.dataset.del, 1);
+      const gone = songs.splice(+d.dataset.del, 1)[0];
+      if (gone && gone.voice) vdb.del(gone.id).catch(() => {});
       try { localStorage.setItem('tulipPIE_songs', JSON.stringify(songs)); } catch (e) {}
       renderSongs(); $('#pmsg', el).textContent = '🗑 Song deleted.';
     });
     renderSongs();
-    return () => { stopPlayback(); document.removeEventListener('keydown', kd); };
+    return () => {
+      stopPlayback(); document.removeEventListener('keydown', kd);
+      if (mediaRec && mediaRec.state === 'recording') mediaRec.stop();
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+    };
   }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
