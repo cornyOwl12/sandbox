@@ -1694,7 +1694,7 @@ const games = {
   }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
-    el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
+    el.innerHTML = `<p class="hint">Help the cheese 🧀 ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
       <div class="stats"><span id="mh">Height: 0 m</span><span id="mb">Best: 0 m</span><span id="mtm">⏱ 0:00</span></div>
       <canvas class="game" width="800" height="460"></canvas>
       <div class="row">
@@ -1884,7 +1884,7 @@ const games = {
         }
       }
       ctx.save(); ctx.translate(sx(S.x), sy(S.y)); ctx.rotate(ang);
-      ctx.font = '30px serif'; ctx.textBaseline = 'middle'; ctx.fillText(save.skin, 0, -4); ctx.restore();
+      ctx.font = '30px serif'; ctx.textBaseline = 'middle'; ctx.fillText(save.skin === '🧒' ? '🧀' : save.skin, 0, -4); ctx.restore();
       ctx.textBaseline = 'alphabetic';
     }
     function loop(t) {
