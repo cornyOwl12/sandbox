@@ -1104,7 +1104,7 @@ const games = {
   /* 🧟 Chill Zombie Manor */
   zombies: { title: '🧟 Chill Zombie Manor: Have a Look Around', start(el) {
     el.innerHTML = `<p class="hint">Walk around with <b>WASD / arrow keys</b> (or tap where to go). Walk up to the zombies to chat. They're super chill. Mostly. 👵 Whatever you do, don't bother Granny Grumbles.</p>
-      <div class="stats"><span id="zroom">📍 Front Hall</span><span id="zshoo">Times Granny shooed you: 0</span></div>
+      <div class="stats"><span id="zroom">📍 Front Hall</span><span id="zshoo">Times Granny caught you: ${save.shoos || 0}/6</span></div>
       <div class="secret-wrap"><canvas class="game" width="800" height="480"></canvas>
         <div class="keypad hidden" id="kp"><button class="kp-x" id="kpx" title="Close">✖</button>
           <div class="kp-title">🔒 Granny's Door</div><div class="kp-display" id="kpd">_ _ _ _</div>
@@ -1135,7 +1135,7 @@ const games = {
       ['📚', 45, 45, 30], ['📚', 85, 45, 30], ['📚', 125, 45, 30], ['🕯️', 210, 50, 24], ['🛏️', 200, 200, 0],
       ['🛁', 300, 80, 46], ['🚽', 300, 205, 30], ['🧻', 340, 205, 18],
       ['🎹', 410, 55, 38], ['🥁', 545, 205, 32], ['🎺', 545, 50, 24],
-      ['🪑', 700, 95, 40], ['🧶', 740, 140, 22], ['🖼️', 640, 40, 26], ['🐈‍⬛', 610, 210, 26], ['🍬', 610, 175, 18], ['🛏️', 745, 60, 36],
+      ['🪑', 700, 95, 40], ['🧶', 740, 140, 22], ['🖼️', 640, 40, 26], ['🐈‍⬛', 610, 210, 26], ['🍬', 645, 215, 16], ['🛏️', 745, 60, 36],
     ];
     const Z = (name, e, x, y, b, lines, still) => ({ name, e, x, y, hx: x, hy: y, b, lines, li: 0, still, tx: x, ty: y, wait: rand(0, 2), near: false });
     const zs = [
@@ -1178,6 +1178,7 @@ const games = {
     $('#kpx', el).addEventListener('click', () => showKp(false));
     const kd = e => {
       const k = e.key.toLowerCase();
+      if (cut) { e.preventDefault(); return; }
       if (kpOpen) {
         if (/^[0-9]$/.test(k)) kpPress(k); else if (k === 'backspace') kpPress('⌫'); else if (k === 'enter') kpPress('✔');
         e.preventDefault(); return;
@@ -1218,8 +1219,70 @@ const games = {
       ctx.font = `${size}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(e, x, y);
       ctx.restore();
     }
+    // ---- the furnace cutscene (Granny's 6th catch) ----
+    let cut = null;
+    function startFurnace() {
+      const had = save.unlimited ? '∞' : save.coins;
+      save.coins = 0; save.unlimited = false; save.shoos = 0; persist();
+      cut = { t: 0, had, done: false }; showKp && kpOpen && showKp(false);
+    }
+    c.addEventListener('pointerdown', () => { if (cut && cut.done) endFurnace(); }, true);
+    function endFurnace() {
+      cut = null; keys = {}; target = null;
+      $('#zshoo', el).textContent = 'Times Granny caught you: 0/6';
+      $('#zmsg', el).textContent = '😵‍💫 You crawl back to the front door, covered in soot and totally broke. Granny is counting your coins somewhere…'; msgT = 6;
+    }
+    function drawFurnace(t, dt) {
+      cut.t += dt; const T = cut.t;
+      const ease = x => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+      ctx.fillStyle = '#2a1a22'; ctx.fillRect(0, 0, 800, 480);
+      ctx.fillStyle = '#3d2630'; for (let x = 0; x < 800; x += 50) ctx.fillRect(x, 0, 2, 380);
+      ctx.fillStyle = '#4a2f24'; ctx.fillRect(0, 380, 800, 100);
+      // furnace
+      const shake = T > 2.5 && T < 3.3 ? Math.sin(T * 80) * 6 : 0;
+      ctx.save(); ctx.translate(shake, 0);
+      ctx.fillStyle = '#5a5a66'; ctx.fillRect(560, 170, 170, 210); ctx.fillRect(610, 40, 60, 140);
+      ctx.fillStyle = '#3c3c46'; ctx.fillRect(575, 250, 140, 110);
+      ctx.fillStyle = `rgba(255,${120 + Math.sin(t / 80) * 40},40,.9)`; ctx.fillRect(590, 265, 110, 85);
+      ctx.font = '46px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🔥', 620 + Math.sin(t / 90) * 4, 310); ctx.fillText('🔥', 670 + Math.cos(t / 110) * 4, 305);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Trebuchet MS'; ctx.fillText("GRANNY'S FURNACE", 645, 205);
+      ctx.restore();
+      // granny carrying the kid to the furnace (0-2s), then the toss (2-2.6s)
+      const gx = 120 + ease(T / 2) * 340;
+      ctx.save(); ctx.filter = 'hue-rotate(70deg) saturate(.7)'; ctx.font = '70px serif'; ctx.fillText('👵', gx, 330 + Math.abs(Math.sin(T * 9)) * -6); ctx.restore();
+      if (T < 2) { ctx.font = '40px serif'; ctx.fillText(save.skin, gx + 10, 268); }
+      else if (T < 2.6) {
+        const k = (T - 2) / .6, x = gx + 10 + k * (645 - gx - 10), y = 268 - Math.sin(k * Math.PI) * 140 + k * 40;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(k * 12); ctx.font = '40px serif'; ctx.fillText(save.skin, 0, 0); ctx.restore();
+      }
+      // boom + shot out of the chimney (2.8-4.2s)
+      if (T > 2.7 && T < 3.6) { ctx.font = `${60 + (T - 2.7) * 120}px serif`; ctx.globalAlpha = Math.max(0, 1 - (T - 2.7)); ctx.fillText('💥', 645, 300); ctx.globalAlpha = 1; }
+      if (T > 3 && T < 4.6) {
+        const k = (T - 3) / 1.6;
+        ctx.save(); ctx.translate(640 + k * 60, 40 - k * 260 + k * k * 320); ctx.rotate(k * 15);
+        ctx.filter = 'brightness(.25)'; ctx.font = '40px serif'; ctx.fillText(save.skin, 0, 0); ctx.restore();
+        ctx.font = '30px serif'; ctx.globalAlpha = .7; ctx.fillText('💨', 640, 30 - k * 20); ctx.globalAlpha = 1;
+      }
+      // granny with the loot (4.2s+)
+      if (T > 4.2) {
+        ctx.font = '44px serif'; ctx.fillText('💰', gx + 46, 290 + Math.sin(t / 150) * 4);
+        ctx.fillStyle = '#ffd1d1'; ctx.strokeStyle = '#2b1d3a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(gx - 120, 165, 240, 46, 10) : ctx.rect(gx - 120, 165, 240, 46); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 16px Trebuchet MS'; ctx.fillText('👵 MINE! ALL MINE! Hehehe!', gx, 188);
+      }
+      // caption bar
+      const caps = [[0, '👵 "SIX TIMES?! That\'s IT, whippersnapper!"'], [2, '👵 "Into the furnace you go!"'], [2.7, '💥 KA-FOOOOM!'], [3.2, '🚀 You get blasted out of the chimney, covered in soot…'],
+        [4.2, `💰 Granny Grumbles stole ALL your coins! (${cut.had} 🪙)`]];
+      const cap = caps.filter(c => T >= c[0]).pop();
+      ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(0, 420, 800, 60);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Trebuchet MS'; ctx.fillText(cap[1], 400, 445);
+      if (T > 5.5) { cut.done = true; ctx.font = '14px Trebuchet MS'; ctx.globalAlpha = .6 + Math.sin(t / 200) * .4; ctx.fillText('(click to continue)', 400, 469); ctx.globalAlpha = 1; }
+      ctx.textBaseline = 'alphabetic';
+    }
     function loop(t) {
       const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (cut) { drawFurnace(t, dt); raf = requestAnimationFrame(loop); return; }
       // player movement
       let dx = 0, dy = 0;
       if (keys.a || keys.arrowleft) dx--; if (keys.d || keys.arrowright) dx++;
@@ -1255,11 +1318,14 @@ const games = {
         granny.x = Math.max(granny.b[0], Math.min(granny.b[0] + granny.b[2], granny.x));
         granny.y = Math.max(granny.b[1], Math.min(granny.b[1] + granny.b[3], granny.y));
         if (gd < 26) {
-          shoos++; player.x = 400; player.y = 430; target = null; keys = {}; granny.state = 'home';
-          $('#zshoo', el).textContent = 'Times Granny shooed you: ' + shoos;
+          save.shoos = (save.shoos || 0) + 1;
+          player.x = 400; player.y = 430; target = null; keys = {}; granny.state = 'home';
+          if (save.shoos >= 6) startFurnace();
+          $('#zshoo', el).textContent = `Times Granny caught you: ${save.shoos}/6`; persist();
           $('#zmsg', el).textContent = pick(['👵 Granny whacked you with her slipper and chased you to the front door! "And STAY out!"',
             '👵 "SCRAM!" Granny bonked you with her cane. You\'re back at the front door.', '👵 Granny shooed you out with a rolled-up newspaper. Rude... but fair.']);
           msgT = 4;
+          if (cut) $('#zmsg', el).textContent = '🔥 Uh oh… Granny has had ENOUGH.';
         }
       } else if (granny.state === 'home') {
         const ddx = granny.home[0] - granny.x, ddy = granny.home[1] - granny.y, d = Math.hypot(ddx, ddy);
@@ -1290,6 +1356,7 @@ const games = {
       ctx.fillStyle = '#4a3a5c'; walls.forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
       if (!save.grannyOpen) { ctx.fillStyle = '#7a4a26'; ctx.fillRect(DOOR[0] - 2, DOOR[1], DOOR[2] + 4, DOOR[3]); ctx.fillStyle = '#e6b422'; ctx.fillRect(DOOR[0] - 1, DOOR[1] + 28, 3, 4); emoji('🔒', LOCK.x, LOCK.y, 22); }
       decor.forEach(([e, x, y, s]) => s && emoji(e, x, y, s));
+      ctx.fillStyle = '#5a5a66'; ctx.fillRect(588, 160, 34, 40); ctx.fillStyle = `rgba(255,${130 + Math.sin(t / 90) * 40},40,.9)`; ctx.fillRect(593, 176, 24, 18); emoji('🔥', 605, 186, 14);
       emoji('🦆', 318, 64, 16);
       if (!save.bomb && !save.unlimited) { ctx.save(); ctx.shadowColor = '#ff5a3a'; ctx.shadowBlur = 10 + Math.sin(t / 180) * 6; emoji('💣', 602, 40, 22); ctx.restore(); }
       if (!save.key) { ctx.save(); ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 12 + Math.sin(t / 200) * 6; emoji('🔑', 762, 222, 22); ctx.restore(); }
