@@ -168,6 +168,12 @@
   .mountain .sign { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); white-space: nowrap; background: var(--cream);
     border: 2px solid var(--ink); border-radius: 6px; padding: 2px 8px; font-weight: bold; font-size: 14px; }
   .mountain .trike { position: absolute; left: 26%; top: 52%; font-size: 26px; transform: rotate(-35deg); }
+  .board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(400px, 100%); aspect-ratio: 1; margin: 0 auto; border: 6px solid #6b3f1f; border-radius: 6px; }
+  .sq { border: none; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; }
+  .sq.light { background: #f3dfb7; cursor: default; } .sq.dark { background: #8a5a3b; }
+  .sq.sel { background: #e6b422; } .sq.target { background: #5fae55; box-shadow: inset 0 0 0 3px #fff8; }
+  .pc { width: 78%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -4px 0 rgba(0,0,0,.3), 0 2px 0 rgba(0,0,0,.35); }
+  .pc.r { background: radial-gradient(circle at 40% 35%, #ff6b6b, #c4182f); } .pc.b { background: radial-gradient(circle at 40% 35%, #555, #151515); }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -187,7 +193,7 @@
 <canvas id="fx"></canvas>
 <div id="scene">
   <div class="sky" id="sky"></div>
-  <span class="moon" style="left:40px">🌙</span>
+  <span class="moon" style="left:300px">🌙</span>
   <svg class="hills" viewBox="0 0 1200 80" preserveAspectRatio="none">
     <path d="M0 60 Q150 0 300 45 T600 40 T900 30 T1200 50 V80 H0Z" fill="#4f8f4a"/>
     <path d="M0 70 Q200 30 400 62 T800 55 T1200 62 V80 H0Z" fill="#5fa653"/>
@@ -686,16 +692,277 @@ const games = {
     return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kh); };
   }},
 
+  /* 🔴 Checkers Club */
+  checkers: { title: '🔴 Checkers Club: Checkers Match', start(el) {
+    if (!games.checkers.score) games.checkers.score = { you: 0, hoot: 0 };
+    const score = games.checkers.score;
+    el.innerHTML = `<p class="hint">You are <b>🔴 red</b> against <b>Professor Hoot 🦉</b>. Click a piece, then click where it goes. Jumps are mandatory, and you can chain double jumps. Reach the far side to get a 👑 king!</p>
+      <div class="stats"><span id="cturn">Your turn</span><span id="cscore"></span></div>
+      <div class="board" id="board"></div>
+      <div class="row"><button class="btn" id="cnew">🔄 New game</button></div><p class="msg" id="cmsg"></p>`;
+    const boardEl = $('#board', el);
+    let B, turn, sel, chain, over, to;
+    const inside = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
+    function newGame() {
+      B = [...Array(8)].map((_, r) => [...Array(8)].map((_, c) => (r + c) % 2 === 1 ? (r < 3 ? { c: 'b', k: false } : r > 4 ? { c: 'r', k: false } : null) : null));
+      turn = 'r'; sel = null; chain = null; over = false; clearTimeout(to);
+      $('#cmsg', el).textContent = ''; render();
+    }
+    function pieceMoves(b, r, c) {
+      const p = b[r][c]; if (!p) return [];
+      const dirs = p.k ? [[1, 1], [1, -1], [-1, 1], [-1, -1]] : p.c === 'r' ? [[-1, 1], [-1, -1]] : [[1, 1], [1, -1]];
+      const out = [];
+      for (const [dr, dc] of dirs) {
+        const r1 = r + dr, c1 = c + dc, r2 = r + 2 * dr, c2 = c + 2 * dc;
+        if (inside(r1, c1) && !b[r1][c1]) out.push({ fr: r, fc: c, r: r1, c: c1 });
+        else if (inside(r2, c2) && b[r1][c1] && b[r1][c1].c !== p.c && !b[r2][c2]) out.push({ fr: r, fc: c, r: r2, c: c2, cap: [r1, c1] });
+      }
+      return out;
+    }
+    function allMoves(b, color, onlyFrom) {
+      let ms = [];
+      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++)
+        if (b[r][c] && b[r][c].c === color && (!onlyFrom || (onlyFrom[0] === r && onlyFrom[1] === c))) ms.push(...pieceMoves(b, r, c));
+      const jumps = ms.filter(m => m.cap);
+      return jumps.length || onlyFrom ? jumps : ms;
+    }
+    function apply(b, m) {
+      const p = b[m.fr][m.fc]; b[m.r][m.c] = p; b[m.fr][m.fc] = null;
+      if (m.cap) b[m.cap[0]][m.cap[1]] = null;
+      let kinged = false;
+      if (!p.k && ((p.c === 'r' && m.r === 0) || (p.c === 'b' && m.r === 7))) { p.k = true; kinged = true; }
+      return kinged;
+    }
+    function afterMove(m, kinged) {
+      if (m.cap && !kinged && allMoves(B, turn, [m.r, m.c]).length) { chain = [m.r, m.c]; sel = chain; render(); if (turn === 'b') to = setTimeout(aiMove, 450); return; }
+      chain = null; sel = null; turn = turn === 'r' ? 'b' : 'r';
+      if (!allMoves(B, turn).length) {
+        over = true;
+        if (turn === 'b') { score.you++; $('#cmsg', el).textContent = '🏆 You beat Professor Hoot! "Hoo... hoo did that?!"'; }
+        else { score.hoot++; $('#cmsg', el).textContent = '🦉 Professor Hoot wins! "A wise move, if I say so myself." Try again!'; }
+      }
+      render();
+      if (turn === 'b' && !over) to = setTimeout(aiMove, 650);
+    }
+    function aiMove() {
+      const ms = allMoves(B, 'b', chain);
+      let bestM = null, bestS = -1e9;
+      for (const m of ms) {
+        const copy = B.map(row => row.map(p => p && { ...p }));
+        const kinged = apply(copy, m);
+        let s = Math.random() * 2 + (m.cap ? 10 : 0) + (kinged ? 6 : 0);
+        // would red be able to jump the piece we just moved?
+        if (allMoves(copy, 'r').some(rm => rm.cap && rm.cap[0] === m.r && rm.cap[1] === m.c)) s -= 7;
+        if (m.c === 0 || m.c === 7) s += 1;
+        if (s > bestS) { bestS = s; bestM = m; }
+      }
+      if (!bestM) return;
+      const kinged = apply(B, bestM);
+      afterMove(bestM, kinged);
+    }
+    boardEl.addEventListener('click', e => {
+      const cell = e.target.closest('.sq'); if (!cell || over || turn !== 'r') return;
+      const r = +cell.dataset.r, c = +cell.dataset.c, legal = allMoves(B, 'r', chain);
+      if (sel) {
+        const m = legal.find(m => m.fr === sel[0] && m.fc === sel[1] && m.r === r && m.c === c);
+        if (m) { const kinged = apply(B, m); afterMove(m, kinged); return; }
+      }
+      if (!chain && B[r][c] && B[r][c].c === 'r') {
+        if (legal.some(m => m.fr === r && m.fc === c)) { sel = [r, c]; $('#cmsg', el).textContent = ''; }
+        else { sel = null; $('#cmsg', el).textContent = legal.some(m => m.cap) ? 'You have a jump, so you must take it!' : "That piece can't move."; }
+        render();
+      }
+    });
+    function render() {
+      const legal = turn === 'r' && !over ? allMoves(B, 'r', chain) : [];
+      const targets = sel ? legal.filter(m => m.fr === sel[0] && m.fc === sel[1]) : [];
+      let h = '';
+      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+        const p = B[r][c], dark = (r + c) % 2 === 1;
+        const isSel = sel && sel[0] === r && sel[1] === c, isT = targets.some(m => m.r === r && m.c === c);
+        h += `<button class="sq ${dark ? 'dark' : 'light'}${isSel ? ' sel' : ''}${isT ? ' target' : ''}" data-r="${r}" data-c="${c}">${p ? `<span class="pc ${p.c}">${p.k ? '👑' : ''}</span>` : ''}</button>`;
+      }
+      boardEl.innerHTML = h;
+      $('#cturn', el).textContent = over ? 'Game over' : turn === 'r' ? (chain ? 'Keep jumping!' : 'Your turn 🔴') : 'Professor Hoot is thinking… 🦉';
+      $('#cscore', el).textContent = `You ${score.you} – ${score.hoot} Hoot`;
+    }
+    $('#cnew', el).addEventListener('click', newGame);
+    newGame();
+    return () => clearTimeout(to);
+  }},
+  /* 🧟 Chill Zombie Manor */
+  zombies: { title: '🧟 Chill Zombie Manor: Have a Look Around', start(el) {
+    el.innerHTML = `<p class="hint">Walk around with <b>WASD / arrow keys</b> (or tap where to go). Walk up to the zombies to chat. They're super chill. Mostly. 👵 Whatever you do, don't bother Granny Grumbles.</p>
+      <div class="stats"><span id="zroom">📍 Front Hall</span><span id="zshoo">Times Granny shooed you: 0</span></div>
+      <canvas class="game" width="800" height="480"></canvas><p class="msg" id="zmsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const walls = [];
+    const hwall = (y, x1, x2, gaps = []) => { let x = x1; for (const [a, b] of [...gaps, [x2, x2]]) { if (a > x) walls.push([x, y - 5, a - x, 10]); x = b; } };
+    const vwall = (x, y1, y2, gaps = []) => { let y = y1; for (const [a, b] of [...gaps, [y2, y2]]) { if (a > y) walls.push([x - 5, y, 10, a - y]); y = b; } };
+    hwall(20, 15, 785); hwall(460, 15, 785); vwall(20, 15, 465); vwall(780, 15, 465);
+    hwall(240, 20, 780, [[110, 170], [420, 480]]);
+    vwall(280, 240, 460, [[330, 390]]); vwall(520, 240, 460, [[330, 390]]);
+    vwall(240, 20, 240, [[100, 160]]); vwall(360, 20, 240); vwall(580, 20, 240, [[85, 145]]);
+    const rooms = [
+      { n: 'Living Room', x: 20, y: 240, w: 260, h: 220, f: '#e8d7b9' },
+      { n: 'Front Hall', x: 280, y: 240, w: 240, h: 220, f: '#d9c7a7' },
+      { n: 'Kitchen', x: 520, y: 240, w: 260, h: 220, f: '#e3eef0' },
+      { n: 'Library', x: 20, y: 20, w: 220, h: 220, f: '#c9b18f' },
+      { n: 'Bathroom', x: 240, y: 20, w: 120, h: 220, f: '#cfe6f3' },
+      { n: 'Music Room', x: 360, y: 20, w: 220, h: 220, f: '#d8cdea' },
+      { n: "Granny's Room (KEEP OUT)", x: 580, y: 20, w: 200, h: 220, f: '#e9c9cf' },
+    ];
+    const decor = [
+      ['🛋️', 80, 410, 44], ['📺', 230, 290, 36], ['🪴', 40, 270, 28], ['🍿', 140, 420, 22],
+      ['🪞', 300, 275, 28], ['🕰️', 500, 275, 30], ['🧥', 300, 430, 24],
+      ['🍳', 745, 280, 32], ['🧁', 640, 380, 22], ['🍵', 670, 385, 22], ['🧊', 750, 430, 30],
+      ['📚', 45, 45, 30], ['📚', 85, 45, 30], ['📚', 125, 45, 30], ['🕯️', 210, 50, 24], ['🛏️', 200, 200, 0],
+      ['🛁', 300, 80, 46], ['🚽', 300, 205, 30], ['🧻', 340, 205, 18],
+      ['🎹', 410, 55, 38], ['🥁', 545, 205, 32], ['🎺', 545, 50, 24],
+      ['🪑', 700, 95, 40], ['🧶', 740, 140, 22], ['🖼️', 640, 40, 26], ['🐈‍⬛', 610, 210, 26], ['🍬', 760, 210, 18], ['🛏️', 745, 60, 36],
+    ];
+    const Z = (name, e, x, y, b, lines, still) => ({ name, e, x, y, hx: x, hy: y, b, lines, li: 0, still, tx: x, ty: y, wait: rand(0, 2), near: false });
+    const zs = [
+      Z('Couch Kevin', '🧟‍♂️', 120, 380, [40, 300, 220, 140], ["This show is so good. I'm dead serious.", "I haven't left this couch in 40 years. Livin' the dream.", 'Wanna watch? It\'s a cooking show. Mostly about brains. KIDDING.']),
+      Z('Greeter Greg', '🧟', 400, 330, [300, 260, 200, 180], ['Welcome to Chill Zombie Manor! Shoes on, nobody cares.', "Granny's room is top right. Don't wake her.", 'Want a hug? No? Fair. I\'m a bit squishy.']),
+      Z('Chef Moldy', '🧟‍♀️', 700, 320, [560, 270, 200, 170], ['Brain-free pancakes, coming right up!', "Taste this. Too salty? I can't taste anything.", "Don't mind the smell. That's just me."]),
+      Z('Bookworm Bea', '🧟‍♀️', 120, 140, [40, 80, 180, 140], ["Shh... I'm at the good part.", 'This one\'s a romance. A zombie falls for a VAMPIRE?! Scandalous.', 'My library card expired in 1873. Nobody\'s checked.']),
+      Z('Bubbles', '🧟', 300, 72, [300, 72, 0, 0], ['DO YOU MIND?!', 'Me and Rubber Ducky are having a moment. 🦆', "I'm just soaking. And slightly dissolving."], true),
+      Z('DJ Rotten', '🧟‍♂️', 470, 140, [380, 90, 180, 130], ["This next song is called 'Grave Vibes'! 🎸", 'I only know one chord. The deadliest one.', 'Rock and roll never dies. Neither do I!']),
+    ];
+    const granny = { name: 'Granny Grumbles', x: 700, y: 118, home: [700, 118], b: [595, 35, 170, 190], state: 'sit', li: 0 };
+    const grannyIdle = ['Who\'s tracking mud in my room?!', 'In MY day we shambled uphill both ways!', 'Turn that racket DOWN, DJ!', "Don't you DARE touch my yarn.", 'Kids these days. No respect for the undead.'];
+    const grannyChase = ['COME HERE, YOU WHIPPERSNAPPER!', "I'll rattle my cane at you!", 'GET OUT OF MY ROOM!'];
+    const player = { x: 400, y: 430 };
+    let target = null, shoos = 0, keys = {}, raf, last = performance.now(), say = null, sayT = 0, msgT = 0;
+    const kd = e => { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) { keys[k] = true; target = null; e.preventDefault(); } };
+    const ku = e => { keys[e.key.toLowerCase()] = false; };
+    document.addEventListener('keydown', kd); document.addEventListener('keyup', ku);
+    c.addEventListener('pointerdown', e => { target = canvasPos(c, e); c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointermove', e => { if (e.buttons) target = canvasPos(c, e); });
+    const roomAt = (x, y) => rooms.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+    const inGranny = () => player.x > 580 && player.y < 240;
+    function pushOut(p, rad) {
+      for (const [x, y, w, h] of walls) {
+        const cx = Math.max(x, Math.min(p.x, x + w)), cy = Math.max(y, Math.min(p.y, y + h));
+        const dx = p.x - cx, dy = p.y - cy, d = Math.hypot(dx, dy);
+        if (d < rad) { if (d > 0.01) { p.x = cx + dx / d * rad; p.y = cy + dy / d * rad; } else p.y += rad; }
+      }
+    }
+    function bubble(x, y, text, color) {
+      ctx.font = 'bold 13px Trebuchet MS';
+      const words = text.split(' '), lines = []; let line = '';
+      for (const w of words) { if (ctx.measureText(line + w).width > 190 && line) { lines.push(line.trim()); line = ''; } line += w + ' '; }
+      lines.push(line.trim());
+      const bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 18, bh = lines.length * 16 + 10;
+      let bx = Math.max(6, Math.min(794 - bw, x - bw / 2)), by = Math.max(6, y - bh - 34);
+      ctx.fillStyle = color || '#fff'; ctx.strokeStyle = '#2b1d3a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, 8) : ctx.rect(bx, by, bw, bh); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#2b1d3a'; ctx.textAlign = 'left';
+      lines.forEach((l, i) => ctx.fillText(l, bx + 9, by + 19 + i * 16));
+    }
+    function emoji(e, x, y, size, filter) {
+      ctx.save(); if (filter) ctx.filter = filter;
+      ctx.font = `${size}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(e, x, y);
+      ctx.restore();
+    }
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      // player movement
+      let dx = 0, dy = 0;
+      if (keys.a || keys.arrowleft) dx--; if (keys.d || keys.arrowright) dx++;
+      if (keys.w || keys.arrowup) dy--; if (keys.s || keys.arrowdown) dy++;
+      if (!dx && !dy && target) { const tx = target.x - player.x, ty = target.y - player.y; if (Math.hypot(tx, ty) > 6) { dx = tx; dy = ty; } else target = null; }
+      if (dx || dy) { const l = Math.hypot(dx, dy); player.x += dx / l * 150 * dt; player.y += dy / l * 150 * dt; }
+      pushOut(player, 13);
+      // chill zombies wander
+      for (const z of zs) {
+        if (!z.still) {
+          z.wait -= dt;
+          if (z.wait <= 0) {
+            const ddx = z.tx - z.x, ddy = z.ty - z.y, d = Math.hypot(ddx, ddy);
+            if (d < 3) { z.tx = z.b[0] + rand(0, z.b[2]); z.ty = z.b[1] + rand(0, z.b[3]); z.wait = rand(1, 3.5); }
+            else { z.x += ddx / d * 26 * dt; z.y += ddy / d * 26 * dt; z.flip = ddx < 0; }
+          }
+        }
+        const near = Math.hypot(z.x - player.x, z.y - player.y) < 80;
+        if (near && !z.near) z.li = (z.li + 1) % z.lines.length;
+        z.near = near;
+      }
+      // granny
+      const gd = Math.hypot(granny.x - player.x, granny.y - player.y);
+      if (inGranny()) {
+        if (granny.state !== 'chase' && gd < 105) { granny.state = 'chase'; granny.li = Math.floor(rand(0, grannyChase.length)); }
+        else if (granny.state === 'sit' || granny.state === 'home') granny.state = granny.state === 'home' ? 'home' : 'sit';
+      } else if (granny.state === 'chase') granny.state = 'home';
+      if (granny.state === 'chase') {
+        const ddx = player.x - granny.x, ddy = player.y - granny.y;
+        granny.x += ddx / gd * 112 * dt; granny.y += ddy / gd * 112 * dt;
+        granny.x = Math.max(granny.b[0], Math.min(granny.b[0] + granny.b[2], granny.x));
+        granny.y = Math.max(granny.b[1], Math.min(granny.b[1] + granny.b[3], granny.y));
+        if (gd < 26) {
+          shoos++; player.x = 400; player.y = 430; target = null; keys = {}; granny.state = 'home';
+          $('#zshoo', el).textContent = 'Times Granny shooed you: ' + shoos;
+          $('#zmsg', el).textContent = pick(['👵 Granny whacked you with her slipper and chased you to the front door! "And STAY out!"',
+            '👵 "SCRAM!" Granny bonked you with her cane. You\'re back at the front door.', '👵 Granny shooed you out with a rolled-up newspaper. Rude... but fair.']);
+          msgT = 4;
+        }
+      } else if (granny.state === 'home') {
+        const ddx = granny.home[0] - granny.x, ddy = granny.home[1] - granny.y, d = Math.hypot(ddx, ddy);
+        if (d < 3) { granny.state = 'sit'; granny.x = granny.home[0]; granny.y = granny.home[1]; }
+        else { granny.x += ddx / d * 60 * dt; granny.y += ddy / d * 60 * dt; }
+      }
+      if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('#zmsg', el).textContent = ''; }
+      const room = roomAt(player.x, player.y); if (room) $('#zroom', el).textContent = '📍 ' + room.n;
+
+      // ---- draw ----
+      ctx.fillStyle = '#3b2a4d'; ctx.fillRect(0, 0, 800, 480);
+      for (const r of rooms) {
+        ctx.fillStyle = r.f; ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.fillStyle = 'rgba(0,0,0,.05)'; for (let x = r.x; x < r.x + r.w; x += 24) ctx.fillRect(x, r.y, 1, r.h);
+        ctx.fillStyle = 'rgba(43,29,58,.35)'; ctx.font = 'bold 12px Trebuchet MS'; ctx.textAlign = 'left'; ctx.fillText(r.n.toUpperCase(), r.x + 12, r.y + r.h - 10);
+      }
+      ctx.fillStyle = '#b2453a'; ctx.fillRect(340, 300, 120, 80); ctx.strokeStyle = '#e8c35a'; ctx.lineWidth = 3; ctx.strokeRect(346, 306, 108, 68);
+      ctx.fillStyle = '#6b3f1f'; ctx.fillRect(370, 455, 60, 12);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText('FRONT DOOR', 400, 464);
+      ctx.fillStyle = '#4a3a5c'; walls.forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
+      decor.forEach(([e, x, y, s]) => s && emoji(e, x, y, s));
+      emoji('🦆', 318, 64, 16);
+      // rocking chair rock
+      const sprites = [...zs.map(z => ({ ...z, kind: 'z' })), { ...granny, kind: 'g' }, { ...player, kind: 'p' }].sort((a, b) => a.y - b.y);
+      for (const s of sprites) {
+        if (s.kind === 'p') { emoji('🧒', s.x, s.y - 6, 30); continue; }
+        if (s.kind === 'g') {
+          const rock = s.state === 'sit' ? Math.sin(t / 300) * .12 : Math.sin(t / 60) * .15;
+          ctx.save(); ctx.translate(s.x, s.y - 8); ctx.rotate(rock);
+          emoji('👵', 0, 0, 34, 'hue-rotate(70deg) saturate(.7)'); emoji('🦯', 18, 6, 20); ctx.restore();
+          ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 11px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText(s.name, s.x, s.y + 22);
+          continue;
+        }
+        const bob = Math.sin(t / 400 + s.hx) * 2;
+        if (s.name === 'Bubbles') { emoji(s.e, s.x - 2, s.y - 4, 26); continue; }
+        ctx.save(); ctx.translate(s.x, s.y - 6 + bob); if (s.flip) ctx.scale(-1, 1); emoji(s.e, 0, 0, 32); ctx.restore();
+        if (s.name === 'DJ Rotten') emoji('🎸', s.x + 16, s.y + 2 + bob, 20);
+        if (s.name === 'Bookworm Bea') emoji('📖', s.x + 14, s.y + 4 + bob, 16);
+        if (s.name === 'Couch Kevin') emoji('🥤', s.x + 15, s.y + 4 + bob, 14);
+      }
+      // bubbles on top
+      for (const z of zs) if (z.near) bubble(z.x, z.y, `${z.name}: ${z.lines[z.li]}`);
+      if (inGranny()) bubble(granny.x, granny.y, granny.state === 'chase' ? `👵 ${grannyChase[granny.li]}` : `👵 ${grannyIdle[Math.floor(t / 2600) % grannyIdle.length]}`, '#ffd1d1');
+      raf = requestAnimationFrame(loop);
+    }
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); document.removeEventListener('keyup', ku); };
+  }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
-    el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>← →</b> pedal, <b>↑ ↓</b> lean back / lean forward. Steep walls need a running start. Pedaling too hard pops a wheelie. No checkpoints. Good luck. 😇</p>
+    el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. Steep walls need a running start. No checkpoints. Good luck. 😇</p>
       <div class="stats"><span id="mh">Height: 0 m</span><span id="mb">Best: 0 m</span><span id="mtm">⏱ 0:00</span></div>
       <canvas class="game" width="800" height="460"></canvas>
       <div class="row">
-        <button class="btn" data-k="leanB">↺ Lean back</button>
-        <button class="btn" data-k="back">◀ Pedal</button>
-        <button class="btn" data-k="fwd">Pedal ▶</button>
-        <button class="btn" data-k="leanF">Lean fwd ↻</button>
+        <button class="btn" data-k="back">◀ A</button>
+        <button class="btn" data-k="jump">Jump (Space)</button>
+        <button class="btn" data-k="fwd">D ▶</button>
         <button class="btn" id="mreset">🔄 Start over</button>
       </div><p class="msg" id="mmsg"></p>`;
     const c = $('canvas', el), ctx = c.getContext('2d'), CW = 800, CH = 460;
@@ -710,7 +977,8 @@ const games = {
     const signs = [[340, 0, 'Mt. Wobblemore ⛰️ no refunds'], [1400, 235, 'Halfway-ish'], [2390, 684, 'Turn back?'], [2925, 875, 'Almost!!']];
     const taunts = ['Gravity: 1, You: 0', 'The mountain sends its regards.', 'Tricycles were not designed for this.', 'That was a learning experience.',
       'Wheee! (not the good kind)', 'Somewhere, a goat is laughing.', 'Have you tried NOT falling?', 'Back to the bottom, champ.'];
-    const G = 900, H = 1 / 240, DRIVE = 220, MAXC = .055, ALPHA = 30, REACT = .5;
+    const G = 900, H = 1 / 240, DRIVE = 220, MAXC = .055, ALPHA = 30, REACT = .15, AIR = .25, JUMP = 320, KICK = 140;
+    let jumpCD = 0;
     const keys = {};
     let R, F, S, pts, L, cam, best, start, won, tauntShown, raf, acc, last;
     function reset() {
@@ -743,8 +1011,15 @@ const games = {
     }
     function step() {
       const pedal = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
-      let lean = (keys.leanF ? 1 : 0) - (keys.leanB ? 1 : 0);
-      if (pedal && F.n) lean -= pedal * REACT; // pedaling hard pops a wheelie
+      const grounded = pts.some(p => p.n);
+      // on the ground pedaling pops a little wheelie; in the air A/D tilt the trike
+      const lean = grounded ? -pedal * REACT : pedal * AIR;
+      jumpCD -= H;
+      if (keys.jump && grounded && jumpCD <= 0) {
+        const facing = F.x >= R.x ? 1 : -1;
+        pts.forEach(p => { p.vy -= JUMP; p.vx += facing * KICK; });
+        jumpCD = .6;
+      }
       for (const p of pts) { p.px = p.x; p.py = p.y; p.vy += G * H; p.x += p.vx * H; p.y += p.vy * H; p.n = null; }
       if (lean) {
         const tw = pts.reduce((s, p) => s + 1 / p.w, 0);
@@ -779,9 +1054,9 @@ const games = {
         p.vx = (p.x - p.px) / H * .9998; p.vy = (p.y - p.py) / H * .9998;
       }
     }
-    const kmap = { ArrowRight: 'fwd', ArrowLeft: 'back', ArrowUp: 'leanB', ArrowDown: 'leanF' };
-    const kd = e => { if (kmap[e.key]) { keys[kmap[e.key]] = true; e.preventDefault(); } };
-    const ku = e => { if (kmap[e.key]) keys[kmap[e.key]] = false; };
+    const kmap = { d: 'fwd', a: 'back', ' ': 'jump', arrowright: 'fwd', arrowleft: 'back' };
+    const kd = e => { const k = kmap[e.key.toLowerCase()]; if (k) { keys[k] = true; e.preventDefault(); } };
+    const ku = e => { const k = kmap[e.key.toLowerCase()]; if (k) keys[k] = false; };
     document.addEventListener('keydown', kd); document.addEventListener('keyup', ku);
     el.querySelectorAll('[data-k]').forEach(b => {
       const on = e => { e.preventDefault(); keys[b.dataset.k] = true; }, off = () => { keys[b.dataset.k] = false; };
@@ -896,7 +1171,7 @@ function building(b) {
     <div class="roof ${b.style || 'peak'}" style="height:${roofH}px;background:${roofBg}"></div>
     <div class="walls" style="height:${wallH}px;background:${b.wall}">
       <span class="sign">${b.name}</span>
-      ${b.windows === false ? '' : '<span class="win l"></span><span class="win r"></span>'}
+      ${b.windows === false ? '' : `<span class="win l"${b.win ? ` style="background:${b.win};box-shadow:0 0 14px ${b.win}"` : ''}></span><span class="win r"${b.win ? ` style="background:${b.win};box-shadow:0 0 14px ${b.win}"` : ''}></span>`}
       <span class="big" style="font-size:${b.size || 46}px">${b.emoji}</span>
     </div>
     <span class="play-tag">🎮 ${b.tag}</span>
@@ -910,6 +1185,8 @@ const places = [
   { key: 'lemonade', x: 410, y: 548, w: 132, h: 112, roofH: 32, style: 'awning', stripes: true, roof: '#ffcc1f', wall: '#c98d4f', windows: false, emoji: '🍋', size: 40, name: "Lulu's Lemonade", tag: 'Lemonade Rush' },
   { key: 'couch', x: 665, y: 514, w: 270, h: 150, roofH: 48, tower: true, roof: '#2f7d3a', wall: '#f3e2c4', emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker' },
   { key: 'nails', x: 985, y: 520, w: 180, h: 144, roofH: 36, style: 'awning', stripes: true, roof: '#ff7fae', wall: '#ffe3f1', emoji: '💅', name: 'Glitter Claws Nails', tag: 'Polish Panic' },
+  { key: 'checkers', x: 678, y: 762, w: 150, h: 108, roofH: 38, roof: '#22223a', wall: 'repeating-conic-gradient(#fff 0 25%, #f3c4c4 0 50%) 0 0/24px 24px', emoji: '🔴⚫', size: 26, name: 'Checkers Club', tag: 'Checkers Match' },
+  { key: 'zombies', x: 70, y: 62, w: 190, h: 143, roofH: 50, roof: '#3b2a4d', wall: '#7d8a76', win: '#a6ff8f', emoji: '🧟', size: 40, name: 'Chill Zombie Manor', tag: 'Explore' },
   { key: 'penny', x: 300, y: 762, w: 190, h: 108, roofH: 38, roof: '#b8692e', wall: '#f6d9b8', emoji: '🪙', size: 34, name: 'The Penny House', tag: 'Penny Press' },
   { key: 'socks', x: 60, y: 762, w: 200, h: 108, roofH: 38, roof: '#3aa0f0', wall: '#e6f4ff', emoji: '🧦', size: 34, name: 'Lost Sock Office', tag: 'Match the Pairs' },
 ];
@@ -940,10 +1217,8 @@ add(`<div class="pond" data-key="rink" style="left:40px;top:492px;width:330px;he
 add(`<div class="fountain" style="left:533px;top:768px;width:130px;height:130px">⛲</div>`);
 add(`<div class="welcome" style="left:845px;top:770px">Welcome to 🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:13px">Population: 47 people &amp; 112 ducks</span></div>`);
 add(`<div class="tree" style="left:885px;top:850px;font-size:28px;letter-spacing:4px">🌷🌷🌼🌷🌷🌼🌷🌷</div>`);
-[[490, 770], [700, 800], [760, 855], [205, 200], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
+[[490, 770], [845, 870], [290, 200], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
   .forEach(([x, y]) => add(`<span class="tree" style="left:${x}px;top:${y}px">${pick(['🌳', '🌲', '🌳'])}</span>`));
-add(`<span class="mover" style="left:700px;top:760px;font-size:24px;--d:70px;animation:pace 5s ease-in-out infinite">🦆</span>`);
-add(`<span class="mover" style="left:740px;top:770px;font-size:20px;--d:50px;animation:pace 4s ease-in-out infinite -1s">🦆</span>`);
 
 // traffic
 const cars = [
@@ -985,7 +1260,7 @@ function openGame(key) {
   closeGame();
   const g = games[key];
   $('#mtitle').textContent = g.title;
-  $('.panel').classList.toggle('wide', key === 'mountain');
+  $('.panel').classList.toggle('wide', key === 'mountain' || key === 'zombies');
   $('#modal').classList.remove('hidden');
   cleanup = g.start($('#game')) || null;
 }
@@ -996,7 +1271,12 @@ function closeGame() {
   if (!$('#modal').classList.contains('hidden')) {
     $('#modal').classList.add('hidden');
     // step the player back out the front door
-    if (lastPlace) { player.y = Math.min(890, lastPlace.y + lastPlace.h + 34); player.x = lastPlace.x + lastPlace.w / 2; lastPlace = null; }
+    if (lastPlace) {
+      player.x = lastPlace.x + lastPlace.w / 2;
+      player.y = Math.min(890, lastPlace.y + lastPlace.h + 34);
+      if (solids().some(r => r.key !== lastPlace.key && player.x > r.x && player.x < r.x + r.w && player.y > r.y && player.y < r.y + r.h + 4)) player.y = lastPlace.y + lastPlace.h + 12;
+      lastPlace = null;
+    }
   }
 }
 $('#close').addEventListener('click', closeGame);
@@ -1016,7 +1296,7 @@ document.addEventListener('pointerdown', e => {
 
 /* ---------------- walking kid ---------------- */
 const playerEl = $('#player');
-const player = { x: 720, y: 885 };
+const player = { x: 700, y: 748 };
 const keys = {};
 const rectOf = el => ({ x: parseFloat(el.style.left), y: parseFloat(el.style.top), w: parseFloat(el.style.width), h: parseFloat(el.style.height), key: el.dataset.key });
 const solids = () => [...town.querySelectorAll('[data-key]')].map(rectOf);
