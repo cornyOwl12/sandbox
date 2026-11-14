@@ -11,6 +11,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🎩 Hats Hats Hats | Hat Rush: give customers the hat they want |
 | 🛋️ Couch-Making Academy | Cushion Stacker: build the tallest couch |
 | 🧦 Lost Sock Office | Memory match: reunite the pairs |
-| 🥧 Tulip PIE Bakery | Pie Tycoon: bake pies and hire helpers |
+| 💅 Glitter Claws Nails | Polish Panic: paint nails to match each customer |
+| 🪙 The Penny House | Penny Press: stamp pennies with perfect timing |
 
 Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.

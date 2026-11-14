@@ -160,11 +160,19 @@
   .card.up, .card.done { background: #fff; }
   .card.done { opacity: .55; cursor: default; }
 
-  /* bakery */
-  .pie-btn { font-size: 110px; background: none; border: none; cursor: pointer; display: block; margin: 0 auto; transition: transform .07s; }
-  .pie-btn:active { transform: scale(.9) rotate(-6deg); }
-  .shop { display: grid; gap: 8px; margin-top: 10px; }
-  .shop button { text-align: left; }
+  /* nails */
+  .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
+  .client-face { font-size: 60px; }
+  .want-row { display: flex; gap: 6px; }
+  .dot { width: 22px; height: 30px; border-radius: 11px 11px 6px 6px; border: 2px solid var(--ink); display: inline-block; }
+  .hand { display: flex; gap: 10px; justify-content: center; align-items: flex-end; margin: 14px auto 4px; padding: 0 0 10px;
+    width: 300px; background: linear-gradient(transparent 60%, #f3c9ae 60%); border-radius: 0 0 60px 60px; }
+  .finger { width: 46px; background: #f3c9ae; border-radius: 23px 23px 0 0; border: 2px solid #d9a78a; border-bottom: none; display: flex; justify-content: center; padding-top: 6px; }
+  .nail { width: 30px; height: 38px; border-radius: 15px 15px 8px 8px; border: 2px solid rgba(0,0,0,.25); cursor: pointer; box-shadow: inset 0 4px 0 rgba(255,255,255,.45); }
+  .polishes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+  .bottle { font: inherit; font-size: 11px; font-weight: bold; display: flex; flex-direction: column; align-items: center; gap: 2px; background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 5px 6px; cursor: pointer; }
+  .bottle span { width: 20px; height: 26px; border-radius: 4px 4px 8px 8px; border: 2px solid var(--ink); }
+  .bottle.on { background: #ffe27a; transform: translateY(-3px); }
 </style>
 </head>
 <body>
@@ -546,32 +554,130 @@ const games = {
     return () => clearTimeout(to);
   }},
 
-  /* 🥧 Pie Bakery Clicker */
-  bakery: { title: '🥧 Tulip PIE Bakery: Pie Tycoon', start(el) {
-    if (!games.bakery.state) games.bakery.state = { pies: 0, owned: [0, 0, 0, 0] };
-    const st = games.bakery.state;
-    const helpers = [['👵 Grandma Baker', 15, 1], ['🐿️ Squirrel Assistant', 60, 4], ['🤖 Pie-O-Tron 3000', 250, 15], ['🌷 Magic Tulip Oven', 1000, 60]];
-    el.innerHTML = `<p class="hint">Click the pie to bake! Hire helpers to bake for you. (Your bakery keeps going while you play other games.)</p>
-      <div class="stats"><span id="pies">🥧 0 pies</span><span id="pps">0 per second</span></div>
-      <button class="pie-btn" id="pie" aria-label="Bake a pie">🥧</button>
-      <div class="shop" id="shop"></div>`;
-    const cost = i => Math.ceil(helpers[i][1] * Math.pow(1.15, st.owned[i]));
-    const pps = () => st.owned.reduce((s, n, i) => s + n * helpers[i][2], 0);
-    function render() {
-      $('#pies', el).textContent = `🥧 ${Math.floor(st.pies)} pies`;
-      $('#pps', el).textContent = `${pps()} per second`;
-      $('#shop', el).innerHTML = helpers.map((h, i) => `<button class="btn" data-i="${i}" ${st.pies < cost(i) ? 'disabled' : ''}>${h[0]}: costs ${cost(i)} 🥧 (+${h[2]}/s), you have ${st.owned[i]}</button>`).join('');
+  /* 💅 Nail Salon */
+  nails: { title: '💅 Glitter Claws Nail Salon: Polish Panic', start(el) {
+    const polish = [['Cherry', '#e8364f'], ['Bubblegum', '#ff7fc4'], ['Lemon', '#ffd92e'], ['Mint', '#5fd3a3'], ['Ocean', '#3aa0f0'], ['Grape', '#8a4fd6'], ['Glitter', 'glitter']];
+    const clients = ['🦩', '🐸', '🦄', '🐙', '🦖', '👵', '🧛', '🐻', '🦊', '🐱'];
+    const paint = c => c === 'glitter' ? 'conic-gradient(#ffd92e, #ff7fc4, #3aa0f0, #5fd3a3, #ffd92e)' : c;
+    el.innerHTML = `<p class="hint">Paint each nail to match what the customer wants. Pick a polish, click the nails, then press <b>All done!</b> You have 60 seconds.</p>
+      <div class="stats"><span id="ncount">💅 Happy customers: 0</span><span id="ntime">⏱ 60</span></div>
+      <div class="client"><span class="client-face" id="nface">🦩</span><div class="bubble"><div style="font-size:.9rem;margin-bottom:4px">I'd like:</div><div class="want-row" id="nwant"></div></div></div>
+      <div class="hand" id="nhand"></div>
+      <div class="polishes" id="npol">${polish.map(([n, c], i) => `<button class="bottle${i === 0 ? ' on' : ''}" data-c="${c}" title="${n}"><span style="background:${paint(c)}"></span>${n}</button>`).join('')}</div>
+      <div class="row"><button class="btn" id="nwipe">🧼 Remover</button><button class="btn big" id="ndone">All done! ✨</button></div>
+      <p class="msg" id="nmsg"></p>`;
+    let sel = polish[0][1], want, nailsNow, count, time, iv, playing;
+    const fingers = [{ h: 58 }, { h: 74 }, { h: 80 }, { h: 74 }, { h: 56 }];
+    function newClient() {
+      $('#nface', el).textContent = pick(clients);
+      const n = Math.random() < .5 ? 1 : Math.random() < .7 ? 2 : 3;
+      const cols = shuffle(polish.map(p => p[1])).slice(0, n);
+      want = fingers.map(() => pick(cols));
+      nailsNow = fingers.map(() => null);
+      $('#nwant', el).innerHTML = want.map(c => `<span class="dot" style="background:${paint(c)}"></span>`).join('');
+      drawHand();
     }
-    $('#pie', el).addEventListener('click', () => { st.pies++; render(); });
-    $('#shop', el).addEventListener('click', e => {
-      const b = e.target.closest('button'); if (!b) return;
-      const i = +b.dataset.i; if (st.pies >= cost(i)) { st.pies -= cost(i); st.owned[i]++; render(); }
+    function drawHand() {
+      $('#nhand', el).innerHTML = fingers.map((f, i) =>
+        `<div class="finger" style="height:${f.h + 40}px"><button class="nail" data-i="${i}" style="background:${nailsNow[i] ? paint(nailsNow[i]) : '#fbe3d6'}"></button></div>`).join('');
+    }
+    $('#npol', el).addEventListener('click', e => {
+      const b = e.target.closest('.bottle'); if (!b) return;
+      el.querySelectorAll('.bottle').forEach(x => x.classList.remove('on')); b.classList.add('on'); sel = b.dataset.c;
     });
-    if (!games.bakery.ticker) games.bakery.ticker = setInterval(() => { st.pies += pps() / 10; games.bakery.onTick && games.bakery.onTick(); }, 100);
-    games.bakery.onTick = render;
-    render();
-    return () => { games.bakery.onTick = null; };
+    $('#nhand', el).addEventListener('click', e => {
+      const n = e.target.closest('.nail'); if (!n || !playing) return;
+      nailsNow[+n.dataset.i] = sel; drawHand();
+    });
+    $('#nwipe', el).addEventListener('click', () => { nailsNow = fingers.map(() => null); drawHand(); });
+    $('#ndone', el).addEventListener('click', () => {
+      if (!playing) return;
+      if (nailsNow.every((c, i) => c === want[i])) {
+        count++; $('#nmsg', el).textContent = pick(['😍 Gorgeous!', '✨ Stunning!', '💖 I love them!', '🤩 So shiny!']);
+        $('#ncount', el).textContent = '💅 Happy customers: ' + count; newClient();
+      } else {
+        $('#nmsg', el).textContent = '🤨 Hmm, that\'s not what I asked for…';
+      }
+    });
+    function begin() {
+      count = 0; time = 60; playing = true;
+      $('#ncount', el).textContent = '💅 Happy customers: 0'; $('#nmsg', el).textContent = ''; newClient();
+      iv = setInterval(() => {
+        time--; $('#ntime', el).textContent = '⏱ ' + time;
+        if (time <= 0) {
+          clearInterval(iv); playing = false;
+          $('#nmsg', el).innerHTML = `Salon closed! ${count} happy customers. <button class="btn" id="nagain">Open again</button>`;
+          $('#nagain', el).addEventListener('click', begin);
+        }
+      }, 1000);
+    }
+    begin();
+    return () => clearInterval(iv);
   }},
+  /* 🪙 Penny Press */
+  penny: { title: '🪙 The Penny House: Penny Press', start(el) {
+    el.innerHTML = `<p class="hint">Copper blanks roll down the belt. Click (or Space) to stamp when a blank is right under the press! A perfect stamp makes a shiny penny.</p>
+      <div class="stats"><span id="pc">🪙 0¢</span><span id="pl">Blanks left: 25</span></div>
+      <canvas class="game" width="480" height="260"></canvas><p class="msg" id="pmsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d'), PX = 240, BELT = 200;
+    let blanks, made, left, spawnT, speed, press, raf, last, over, pops;
+    function reset() { blanks = []; made = 0; left = 25; spawnT = 0; speed = 110; press = 0; over = false; pops = []; last = performance.now(); $('#pmsg', el).textContent = ''; }
+    function stamp() {
+      if (over) { reset(); return; }
+      if (press > 0) return;
+      press = 1;
+      const b = blanks.filter(b => !b.done).sort((a, b) => Math.abs(a.x - PX) - Math.abs(b.x - PX))[0];
+      if (!b) return;
+      const d = Math.abs(b.x - PX);
+      if (d < 10) { b.done = 'shiny'; made += 1; pops.push({ x: PX, y: BELT - 60, t: 1, txt: '✨ Perfect!' }); }
+      else if (d < 26) { b.done = 'wonky'; made += 1; pops.push({ x: PX, y: BELT - 60, t: 1, txt: 'Wonky penny' }); }
+    }
+    c.addEventListener('pointerdown', stamp);
+    const kh = e => { if (e.code === 'Space') { e.preventDefault(); stamp(); } };
+    document.addEventListener('keydown', kh);
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (!over) {
+        spawnT -= dt;
+        if (spawnT <= 0 && left > 0) { blanks.push({ x: -20, done: null }); left--; spawnT = rand(.7, 1.4); speed += 4; }
+        blanks.forEach(b => b.x += speed * dt);
+        blanks = blanks.filter(b => b.x < 520);
+        if (left === 0 && blanks.length === 0) {
+          over = true;
+          $('#pmsg', el).textContent = made >= 20 ? `🏦 Master minter! You made ${made}¢!` : `You made ${made}¢. Click the machine to run it again!`;
+        }
+      }
+      press = Math.max(0, press - dt * 5);
+      // factory wall
+      ctx.fillStyle = '#efe2cf'; ctx.fillRect(0, 0, 480, 260);
+      ctx.fillStyle = '#e2d1b8'; for (let i = 0; i < 480; i += 48) ctx.fillRect(i, 0, 3, 260);
+      // belt
+      ctx.fillStyle = '#4a4655'; ctx.fillRect(0, BELT + 14, 480, 22);
+      ctx.fillStyle = '#6d6880'; for (let i = (t / 8) % 30 - 30; i < 480; i += 30) ctx.fillRect(i, BELT + 18, 14, 4);
+      // target marker
+      ctx.fillStyle = 'rgba(255,216,74,.35)'; ctx.fillRect(PX - 18, BELT - 6, 36, 20);
+      // blanks / pennies
+      blanks.forEach(b => {
+        ctx.beginPath(); ctx.ellipse(b.x, BELT + 4, 18, b.done === 'wonky' ? 8 : 10, b.done === 'wonky' ? .4 : 0, 0, Math.PI * 2);
+        ctx.fillStyle = b.done === 'shiny' ? '#e8913a' : b.done === 'wonky' ? '#b8692e' : '#c98552'; ctx.fill();
+        ctx.strokeStyle = '#7a4520'; ctx.lineWidth = 2; ctx.stroke();
+        if (b.done === 'shiny') { ctx.fillStyle = '#fff3c4'; ctx.font = 'bold 11px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText('1¢', b.x, BELT + 8); }
+      });
+      // press
+      const drop = press * 46;
+      ctx.fillStyle = '#7d7a8c'; ctx.fillRect(PX - 6, 0, 12, 120 + drop);
+      ctx.fillStyle = '#5a5768'; ctx.fillRect(PX - 30, 110 + drop, 60, 26);
+      ctx.fillStyle = '#ffd84a'; ctx.fillRect(PX - 30, 132 + drop, 60, 5);
+      ctx.fillStyle = '#c94a3f'; ctx.font = 'bold 14px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText('PENNY-MATIC', PX, 40);
+      pops.forEach(p => { p.t -= dt; p.y -= 30 * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 16px Trebuchet MS'; ctx.fillText(p.txt, p.x + 80, p.y); ctx.globalAlpha = 1; });
+      pops = pops.filter(p => p.t > 0);
+      $('#pc', el).textContent = `🪙 ${made}¢`; $('#pl', el).textContent = 'Blanks left: ' + (left + blanks.filter(b => !b.done && b.x < PX + 26).length);
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kh); };
+  }},
+
 };
 
 /* ---------------- town layout (scene is 1200 x 900) ---------------- */
@@ -611,7 +717,8 @@ const places = [
   { key: 'hats', x: 985, y: 245, w: 175, h: 143, roofH: 30, style: 'flat', roof: '#22223a', wall: '#ffd1dc', emoji: '🎩', name: 'Hats Hats Hats', tag: 'Hat Rush' },
   { key: 'lemonade', x: 410, y: 548, w: 132, h: 112, roofH: 32, style: 'awning', stripes: true, roof: '#ffcc1f', wall: '#c98d4f', windows: false, emoji: '🍋', size: 40, name: "Lulu's Lemonade", tag: 'Lemonade Rush' },
   { key: 'couch', x: 665, y: 514, w: 270, h: 150, roofH: 48, tower: true, roof: '#2f7d3a', wall: '#f3e2c4', emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker' },
-  { key: 'bakery', x: 985, y: 520, w: 180, h: 144, roofH: 36, style: 'awning', stripes: true, roof: '#ff7fae', wall: '#fff0d6', emoji: '🥧', name: 'Tulip PIE Bakery', tag: 'Pie Tycoon' },
+  { key: 'nails', x: 985, y: 520, w: 180, h: 144, roofH: 36, style: 'awning', stripes: true, roof: '#ff7fae', wall: '#ffe3f1', emoji: '💅', name: 'Glitter Claws Nails', tag: 'Polish Panic' },
+  { key: 'penny', x: 300, y: 762, w: 190, h: 108, roofH: 38, roof: '#b8692e', wall: '#f6d9b8', emoji: '🪙', size: 34, name: 'The Penny House', tag: 'Penny Press' },
   { key: 'socks', x: 60, y: 762, w: 200, h: 108, roofH: 38, roof: '#3aa0f0', wall: '#e6f4ff', emoji: '🧦', size: 34, name: 'Lost Sock Office', tag: 'Match the Pairs' },
 ];
 places.forEach(b => add(building(b)));
@@ -636,10 +743,10 @@ add(`<div class="pond" data-key="rink" style="left:40px;top:492px;width:330px;he
 add(`<div class="fountain" style="left:533px;top:768px;width:130px;height:130px">⛲</div>`);
 add(`<div class="welcome" style="left:845px;top:770px">Welcome to 🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:13px">Population: 47 people &amp; 112 ducks</span></div>`);
 add(`<div class="tree" style="left:885px;top:850px;font-size:28px;letter-spacing:4px">🌷🌷🌼🌷🌷🌼🌷🌷</div>`);
-[[300, 790], [380, 840], [700, 800], [760, 855], [205, 200], [935, 200], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
+[[490, 770], [700, 800], [760, 855], [205, 200], [935, 200], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
   .forEach(([x, y]) => add(`<span class="tree" style="left:${x}px;top:${y}px">${pick(['🌳', '🌲', '🌳'])}</span>`));
-add(`<span class="mover" style="left:420px;top:870px;font-size:24px;--d:70px;animation:pace 5s ease-in-out infinite">🦆</span>`);
-add(`<span class="mover" style="left:460px;top:880px;font-size:20px;--d:50px;animation:pace 4s ease-in-out infinite -1s">🦆</span>`);
+add(`<span class="mover" style="left:700px;top:760px;font-size:24px;--d:70px;animation:pace 5s ease-in-out infinite">🦆</span>`);
+add(`<span class="mover" style="left:740px;top:770px;font-size:20px;--d:50px;animation:pace 4s ease-in-out infinite -1s">🦆</span>`);
 
 // traffic
 const cars = [
@@ -711,7 +818,7 @@ document.addEventListener('pointerdown', e => {
 
 /* ---------------- walking kid ---------------- */
 const playerEl = $('#player');
-const player = { x: 450, y: 860 };
+const player = { x: 720, y: 885 };
 const keys = {};
 const rectOf = el => ({ x: parseFloat(el.style.left), y: parseFloat(el.style.top), w: parseFloat(el.style.width), h: parseFloat(el.style.height), key: el.dataset.key });
 const solids = () => [...town.querySelectorAll('[data-key]')].map(rectOf);
