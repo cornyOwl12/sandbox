@@ -247,6 +247,20 @@
   .btn.del { background: #ffd1d1; padding: 4px 9px; }
   .btn.del.confirm { background: #e8364f; color: #fff; }
   .gallery figure .del { margin-top: 4px; font-size: 12px; }
+  .secret-wrap { position: relative; }
+  .secret-btn { position: absolute; right: 6px; bottom: 6px; font-size: 14px; background: none; border: none; cursor: pointer; opacity: .28; padding: 2px; filter: grayscale(.4); transition: opacity .2s, transform .2s; }
+  .secret-btn:hover { opacity: 1; transform: scale(1.4) rotate(-8deg); filter: none; }
+  .vault-wrap { position: relative; height: 230px; background: linear-gradient(#6d6880, #4a4655); border-radius: 14px; border: 4px solid var(--ink); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .vault { position: relative; width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle, #d8d8e0 0 30%, #a9a9b8 31% 60%, #8d8da0 61%); border: 8px solid #555; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 0 rgba(0,0,0,.3); transition: transform .9s cubic-bezier(.3,1.4,.6,1), opacity .9s; z-index: 2; }
+  .vault-wheel { font-size: 70px; color: #555; animation: spin 12s linear infinite; }
+  .vault-label { position: absolute; bottom: 22px; font-weight: bold; color: #444; letter-spacing: .2em; font-size: 12px; }
+  .vault-bomb { position: absolute; top: -10px; right: -6px; font-size: 44px; animation: twinkle .4s infinite; }
+  .vault.blown { transform: translate(260px, -160px) rotate(220deg) scale(.6); opacity: 0; }
+  .penny-pile { position: absolute; inset: 0; pointer-events: none; }
+  .fall-penny { position: absolute; top: -30px; font-size: 22px; animation: pennyfall 1s ease-in forwards; }
+  @keyframes pennyfall { to { top: 190px; transform: rotate(360deg); } }
+  .panel.shake { animation: shake .5s; }
+  @keyframes shake { 20% { transform: translate(-10px, 4px); } 40% { transform: translate(9px, -6px); } 60% { transform: translate(-7px, 5px); } 80% { transform: translate(5px, -3px); } }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -353,13 +367,13 @@ const SKINS = [
   { e: '👻', n: 'Ghost', r: 'legendary' }, { e: '🦄', n: 'Unicorn', r: 'legendary' }, { e: '🧟', n: 'Zombie', r: 'legendary' },
 ];
 const save = (() => {
-  const d = { coins: 0, key: false, skins: ['🧒'], skin: '🧒' };
+  const d = { coins: 0, key: false, bomb: false, unlimited: false, skins: ['🧒'], skin: '🧒' };
   try { return Object.assign(d, JSON.parse(localStorage.getItem('tulipPIE') || '{}')); } catch (e) { return d; }
 })();
 function persist() { try { localStorage.setItem('tulipPIE', JSON.stringify(save)); } catch (e) {} updateHud(); }
 function updateHud() {
   const hud = document.getElementById('hud');
-  if (hud) hud.innerHTML = `<span>🪙 ${save.coins}</span><span>${save.key ? '🔑 Key found' : '🔑 ???'}</span><span>${save.skin}</span>`;
+  if (hud) hud.innerHTML = `<span>🪙 ${save.unlimited ? '∞' : save.coins}</span><span>${save.key ? '🔑 Key found' : '🔑 ???'}</span>${save.bomb ? '<span>💣</span>' : ''}<span>${save.skin}</span>`;
   const p = document.getElementById('player'); if (p) p.textContent = save.skin;
   const cas = document.querySelector('[data-key="casino"]');
   if (cas) {
@@ -903,7 +917,8 @@ const games = {
   penny: { title: '🪙 The Penny House: Penny Press', start(el) {
     el.innerHTML = `<p class="hint">Copper blanks roll down the belt. Click (or Space) to stamp when a blank is right under the press! A perfect stamp makes a shiny penny.</p>
       <div class="stats"><span id="pc">🪙 0¢</span><span id="pl">Blanks left: 25</span></div>
-      <canvas class="game" width="480" height="260"></canvas><p class="msg" id="pmsg"></p>`;
+      <div class="secret-wrap"><canvas class="game" width="480" height="260"></canvas><button class="secret-btn" id="secret" title="hmm, a loose brick?">🧱</button></div><p class="msg" id="pmsg"></p>`;
+    $('#secret', el).addEventListener('click', e => { e.stopPropagation(); openGame('bank'); });
     const c = $('canvas', el), ctx = c.getContext('2d'), PX = 240, BELT = 200;
     let blanks, made, left, spawnT, speed, press, raf, last, over, pops;
     function reset() { blanks = []; made = 0; left = 25; spawnT = 0; speed = 110; press = 0; over = false; pops = []; last = performance.now(); $('#pmsg', el).textContent = ''; }
@@ -1185,6 +1200,10 @@ const games = {
         else { granny.x += ddx / d * 60 * dt; granny.y += ddy / d * 60 * dt; }
       }
       if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('#zmsg', el).textContent = ''; }
+      if (!save.bomb && !save.unlimited && Math.hypot(player.x - 602, player.y - 40) < 24) {
+        save.bomb = true; persist();
+        $('#zmsg', el).textContent = '💣 You swiped Granny\'s emergency cartoon bomb! Somebody, somewhere, has a vault that needs opening… (psst: the Penny House)'; msgT = 6;
+      }
       if (!save.key && Math.hypot(player.x - 762, player.y - 222) < 24) {
         save.key = true; persist();
         $('#zmsg', el).textContent = '🔑 You grabbed the casino key from Granny\'s room! The Lucky Clover Casino is now OPEN.'; msgT = 6;
@@ -1204,6 +1223,7 @@ const games = {
       ctx.fillStyle = '#4a3a5c'; walls.forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
       decor.forEach(([e, x, y, s]) => s && emoji(e, x, y, s));
       emoji('🦆', 318, 64, 16);
+      if (!save.bomb && !save.unlimited) { ctx.save(); ctx.shadowColor = '#ff5a3a'; ctx.shadowBlur = 10 + Math.sin(t / 180) * 6; emoji('💣', 602, 40, 22); ctx.restore(); }
       if (!save.key) { ctx.save(); ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 12 + Math.sin(t / 200) * 6; emoji('🔑', 762, 222, 22); ctx.restore(); }
       // rocking chair rock
       const sprites = [...zs.map(z => ({ ...z, kind: 'z' })), { ...granny, kind: 'g' }, { ...player, kind: 'p' }].sort((a, b) => a.y - b.y);
@@ -1328,9 +1348,9 @@ const games = {
         return `<button class="skin ${s.r}${own ? '' : ' unowned'}${save.skin === s.e ? ' on' : ''}" data-e="${s.e}" ${own ? '' : 'disabled'} title="${own ? s.n : '???'}">
           <span>${own ? s.e : '❓'}</span><small>${own ? s.n : s.r}</small></button>`;
       }).join('');
-      $('#scoins', el).textContent = `🪙 ${save.coins} coins`;
+      $('#scoins', el).textContent = save.unlimited ? '🪙 ∞ coins (bank heist money 😎)' : `🪙 ${save.coins} coins`;
       $('#sowned', el).textContent = `Skins: ${save.skins.length}/${SKINS.length}`;
-      $('#spin', el).disabled = spinning || save.coins < 1;
+      $('#spin', el).disabled = spinning || (!save.unlimited && save.coins < 1);
     }
     $('#ward', el).addEventListener('click', e => {
       const b = e.target.closest('.skin'); if (!b || b.disabled) return;
@@ -1343,8 +1363,8 @@ const games = {
       return pool[0];
     }
     $('#spin', el).addEventListener('click', () => {
-      if (spinning || save.coins < 1) return;
-      save.coins--; persist(); spinning = true; renderWard();
+      if (spinning || (!save.unlimited && save.coins < 1)) return;
+      if (!save.unlimited) save.coins--; persist(); spinning = true; renderWard();
       $('#smsg', el).textContent = '🎶 Spinning…';
       const roll = Math.random();
       let final, outcome, prize = null;
@@ -1691,6 +1711,56 @@ const games = {
       if (mediaRec && mediaRec.state === 'recording') mediaRec.stop();
       if (micStream) micStream.getTracks().forEach(t => t.stop());
     };
+  }},
+  /* 🏦 Secret bank (reached from a hidden button in the Penny House) */
+  bank: { title: '🏦 First Bank of Tulip PIE (SECRET VAULT)', start(el) {
+    el.innerHTML = `<div class="vault-wrap"><div class="vault" id="vault"><div class="vault-wheel">✚</div><span class="vault-label">VAULT</span></div>
+        <div class="penny-pile" id="pile"></div></div>
+      <p class="msg" id="bmsg"></p><div class="row" id="bbtns"></div>`;
+    const msg = $('#bmsg', el), btns = $('#bbtns', el), vault = $('#vault', el);
+    let timers = [];
+    if (save.unlimited) {
+      vault.classList.add('blown');
+      msg.innerHTML = 'The vault is completely empty. You already took ALL the pennies. 😎<br>You have <b>∞ coins</b> at the Lucky Clover Casino.';
+      return;
+    }
+    if (!save.bomb) {
+      msg.innerHTML = `The vault door is ten feet of solid steel. No riddle, no keypad… you'd need something that goes <b>KABOOM</b>.<br>
+        <span style="font-weight:normal">Word around town is that Granny Grumbles keeps a cartoon bomb tucked in a corner of her room "for emergencies"… 💣👵</span>`;
+      return;
+    }
+    msg.textContent = 'You brought the 💣 from Granny\'s room. Plant it on the vault door?';
+    btns.innerHTML = '<button class="btn big" id="plant">💣 Plant the bomb</button>';
+    $('#plant', el).addEventListener('click', () => {
+      btns.innerHTML = ''; vault.insertAdjacentHTML('beforeend', '<span class="vault-bomb">💣</span>');
+      let n = 3; msg.textContent = `Fuse lit! Stand back! ${n}…`;
+      const iv = setInterval(() => {
+        n--;
+        if (n > 0) { msg.textContent = `Fuse lit! Stand back! ${n}…`; return; }
+        clearInterval(iv);
+        msg.innerHTML = '💥 <b>KA-BOOOOM!</b> 💥';
+        $('.panel').classList.add('shake'); timers.push(setTimeout(() => $('.panel').classList.remove('shake'), 600));
+        vault.classList.add('blown');
+        const r = vault.getBoundingClientRect();
+        for (let k = 0; k < 7; k++) timers.push(setTimeout(() => launch(r.left + rand(-60, r.width + 60), r.top + rand(-40, r.height)), k * 120));
+        const pile = $('#pile', el);
+        for (let k = 0; k < 60; k++) timers.push(setTimeout(() => {
+          const c = document.createElement('span'); c.className = 'fall-penny'; c.textContent = '🪙';
+          c.style.left = rand(5, 95) + '%'; c.style.animationDuration = rand(.6, 1.3) + 's'; pile.appendChild(c);
+        }, 300 + k * 25));
+        timers.push(setTimeout(() => {
+          msg.innerHTML = 'The vault is OPEN! Mountains of pennies everywhere! 🤑';
+          btns.innerHTML = '<button class="btn big" id="grab">💰 Stuff your pockets with ALL the pennies</button>';
+          $('#grab', el).addEventListener('click', () => {
+            save.unlimited = true; save.bomb = false; persist();
+            btns.innerHTML = '';
+            msg.innerHTML = '🤑 You grabbed EVERY. SINGLE. PENNY.<br>You now have <b>∞ coins</b>. Go spin to your heart\'s content at the <b>Lucky Clover Casino</b>! 🍀🎰';
+          });
+        }, 2200));
+      }, 900);
+      timers.push(iv);
+    });
+    return () => timers.forEach(t => { clearTimeout(t); clearInterval(t); });
   }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {

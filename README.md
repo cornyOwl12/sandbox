@@ -20,6 +20,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🐼 Panda Gym | Bamboo Workout: a rhythm game with Coach Bao Bao |
 | 🎹 Tiny Piano | Out on the grass. Click it and it zooms up big: play, record (optionally with your voice 🎤), save and delete songs |
 | 🥄 Spoon Orchard | Spoon Harvest: pick ripe spoons, grab golden ones, avoid the forks |
+| 🏦 Secret bank | Find the hidden 🧱 in Penny Press, bring Granny's 💣, blow the vault, get ∞ casino coins |
 | 🎰 Lucky Clover Casino | Locked until you find the key. Spend race coins on skin slots, then pick a skin in the wardrobe |
 
 Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.
