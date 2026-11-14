@@ -75,6 +75,7 @@
     background: #9ccf6a; border: 6px solid #a0703f; outline: 3px dashed #7a5230; outline-offset: -12px; }
   .pond { position: absolute; z-index: 3; cursor: pointer; border-radius: 50%;
     background: radial-gradient(ellipse at 40% 35%, #ffffff 0 10%, #d9f3ff 30%, #a8dcf5 75%); border: 10px solid #f4fbff; box-shadow: 0 0 0 4px #bfe3f2, 0 8px 0 rgba(0,0,0,.12); transition: filter .15s; }
+  .duckpond { background: radial-gradient(ellipse at 40% 35%, #b8ecff 0 15%, #6cc4ef 60%, #4fa9de); border-color: #c9b38a; box-shadow: 0 0 0 4px #a8916a, 0 6px 0 rgba(0,0,0,.12); }
   .pond:hover, .paddock:hover { filter: brightness(1.07); }
   .pond .sign, .paddock .sign { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; background: var(--cream); border: 2px solid var(--ink); border-radius: 6px; padding: 2px 8px; font-weight: bold; font-size: 14px; z-index: 2; }
   .orbit { position: absolute; left: 50%; top: 50%; width: 0; height: 0; animation: spin linear infinite; }
@@ -275,8 +276,8 @@ const games = {
 
   /* 🐴 Pony Derby */
   stable: { title: '🐴 Hoofbeat Stables: Pony Derby', start(el) {
-    const names = ['Buttercup (you!)', 'Sir Neighs-a-Lot', 'Pickles'];
-    el.innerHTML = `<p class="hint">You ride <b>Buttercup</b> in the top lane. Mash the button (or Space) to gallop!</p>
+    const names = ['Sir Neighs-a-Lot (you!)', 'Buttercup', 'Pickles'];
+    el.innerHTML = `<p class="hint">You ride <b>Sir Neighs-a-Lot</b> in the top lane. Mash the button (or Space) to gallop!</p>
       <div class="track">${names.map((n, i) => `<div class="lane"><span class="name">${n}</span><span class="horse" id="h${i}">${i === 0 ? '🐎' : '🐴'}</span><span class="finish">🏁</span></div>`).join('')}</div>
       <div class="row"><button class="btn big" id="gallop">Giddy-up!</button></div><p class="msg" id="dmsg"></p>`;
     const horses = [0, 1, 2].map(i => $('#h' + i, el)), msg = $('#dmsg', el), btn = $('#gallop', el);
@@ -292,7 +293,7 @@ const games = {
       const w = pos.findIndex(p => p >= 100);
       if (w < 0) return;
       state = 'done'; clearInterval(iv);
-      msg.textContent = w === 0 ? '🏆 Buttercup wins! You are a champion jockey!' : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
+      msg.textContent = w === 0 ? '🏆 Sir Neighs-a-Lot wins! You are a champion jockey!' : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
       btn.textContent = 'Race again';
     }
     function gallop() { if (state === 'run') { pos[0] += 2.1; check(); draw(); } else if (state === 'done') countdown(); }
@@ -954,9 +955,80 @@ const games = {
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); document.removeEventListener('keyup', ku); };
   }},
+  /* 🦆 Duck Pond */
+  ducks: { title: '🦆 The Duck Pond: Feed the Ducks', start(el) {
+    el.innerHTML = `<p class="hint">Click the water to toss bread 🍞. Feed the ducks as much as you can in 40 seconds, but watch out for <b>Gerald the goose 🪿</b>. He steals everything.</p>
+      <div class="stats"><span id="dfed">🦆 Duck bites: 0</span><span id="dgoose">🪿 Goose stole: 0</span><span id="dtime">⏱ 40</span></div>
+      <canvas class="game" width="480" height="320" style="cursor:pointer"></canvas><p class="msg" id="dmsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const names = ['Quackers', 'Puddles', 'Waddles', 'Sir Floats', 'Nugget', 'Bill'];
+    let ducks, goose, crumbs, fed, stolen, time, over, raf, last, pops, honkT;
+    function reset() {
+      ducks = names.map(n => ({ n, x: rand(60, 420), y: rand(60, 260), tx: rand(60, 420), ty: rand(60, 260), fed: 0, flip: false }));
+      goose = { x: 440, y: 40, flip: true };
+      crumbs = []; pops = []; fed = 0; stolen = 0; time = 40; over = false; honkT = 0; last = performance.now();
+      $('#dmsg', el).textContent = '';
+    }
+    const inPond = (x, y) => ((x - 240) / 225) ** 2 + ((y - 160) / 145) ** 2 < 1;
+    c.addEventListener('pointerdown', e => {
+      if (over) { reset(); return; }
+      const p = canvasPos(c, e);
+      if (!inPond(p.x, p.y)) return;
+      if (crumbs.length < 4) crumbs.push({ x: p.x, y: p.y, s: 0 });
+    });
+    function swimTo(a, tx, ty, sp, dt) {
+      const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
+      if (d > 1) { a.x += dx / d * Math.min(d, sp * dt); a.y += dy / d * Math.min(d, sp * dt); if (Math.abs(dx) > 2) a.flip = dx > 0; }
+      return d;
+    }
+    function nearestCrumb(a) { let best = null, bd = 1e9; for (const cr of crumbs) { const d = Math.hypot(cr.x - a.x, cr.y - a.y); if (d < bd) { bd = d; best = cr; } } return best; }
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (!over) {
+        time -= dt;
+        for (const d of ducks) {
+          const cr = nearestCrumb(d);
+          if (cr) { if (swimTo(d, cr.x, cr.y, 75, dt) < 12) { crumbs.splice(crumbs.indexOf(cr), 1); d.fed++; fed++; pops.push({ x: d.x, y: d.y - 20, t: 1, txt: '💛' }); } }
+          else if (swimTo(d, d.tx, d.ty, 22, dt) < 4 || !inPond(d.tx, d.ty)) { do { d.tx = rand(40, 440); d.ty = rand(40, 280); } while (!inPond(d.tx, d.ty)); }
+        }
+        const gc = nearestCrumb(goose);
+        if (gc) { if (swimTo(goose, gc.x, gc.y, 92, dt) < 14) { crumbs.splice(crumbs.indexOf(gc), 1); stolen++; honkT = 1.2; pops.push({ x: goose.x, y: goose.y - 26, t: 1.2, txt: 'HONK!' }); } }
+        else swimTo(goose, 240 + Math.cos(t / 3000) * 170, 160 + Math.sin(t / 2100) * 100, 30, dt);
+        crumbs.forEach(cr => cr.s += dt);
+        if (time <= 0) {
+          time = 0; over = true;
+          const top = ducks.slice().sort((a, b) => b.fed - a.fed)[0];
+          $('#dmsg', el).textContent = fed > stolen
+            ? `🦆 The ducks got ${fed} bites! ${top.n} is extra happy. Gerald stole ${stolen}. Click the pond to play again.`
+            : `🪿 Gerald stole ${stolen} and the ducks only got ${fed}. HONK. Click the pond to try again.`;
+        }
+      }
+      honkT = Math.max(0, honkT - dt);
+      // draw
+      ctx.fillStyle = '#7cc46a'; ctx.fillRect(0, 0, 480, 320);
+      ctx.fillStyle = '#5fae55'; for (let i = 0; i < 40; i++) ctx.fillRect((i * 97) % 480, (i * 53) % 320, 3, 8);
+      ctx.fillStyle = '#c9b38a'; ctx.beginPath(); ctx.ellipse(240, 160, 234, 154, 0, 0, Math.PI * 2); ctx.fill();
+      const g = ctx.createRadialGradient(220, 140, 20, 240, 160, 230); g.addColorStop(0, '#9ee0ff'); g.addColorStop(1, '#4fa9de');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(240, 160, 225, 145, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) { const r = ((t / 40 + i * 30) % 150); ctx.beginPath(); ctx.ellipse(120 + i * 60, 90 + (i % 2) * 120, r * .3, r * .12, 0, 0, Math.PI * 2); ctx.globalAlpha = 1 - r / 150; ctx.stroke(); ctx.globalAlpha = 1; }
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '22px serif'; ctx.fillText('🪷', 90, 230); ctx.fillText('🪷', 380, 80); ctx.font = '28px serif'; ctx.fillText('🌾', 30, 40); ctx.fillText('🌾', 450, 290);
+      crumbs.forEach(cr => { ctx.font = '18px serif'; ctx.fillText('🍞', cr.x, cr.y + Math.sin(cr.s * 4) * 2); });
+      const sprite = (e, a, size) => { ctx.save(); ctx.translate(a.x, a.y + Math.sin(t / 300 + a.x) * 1.5); if (a.flip) ctx.scale(-1, 1); ctx.font = size + 'px serif'; ctx.fillText(e, 0, 0); ctx.restore(); };
+      ducks.forEach(d => { sprite('🦆', d, 30); ctx.font = 'bold 10px Trebuchet MS'; ctx.fillStyle = '#123'; ctx.fillText(d.n, d.x, d.y + 22); });
+      sprite('🪿', goose, 38 + (honkT > 0 ? 6 : 0)); ctx.font = 'bold 10px Trebuchet MS'; ctx.fillStyle = '#123'; ctx.fillText('Gerald', goose.x, goose.y + 26);
+      pops.forEach(p => { p.t -= dt; p.y -= 25 * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.font = 'bold 16px Trebuchet MS'; ctx.fillStyle = '#2b1d3a'; ctx.fillText(p.txt, p.x, p.y); ctx.globalAlpha = 1; });
+      pops = pops.filter(p => p.t > 0);
+      $('#dfed', el).textContent = '🦆 Duck bites: ' + fed; $('#dgoose', el).textContent = '🪿 Goose stole: ' + stolen; $('#dtime', el).textContent = '⏱ ' + Math.ceil(time);
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
-    el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. Steep walls need a running start. No checkpoints. Good luck. 😇</p>
+    el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
       <div class="stats"><span id="mh">Height: 0 m</span><span id="mb">Best: 0 m</span><span id="mtm">⏱ 0:00</span></div>
       <canvas class="game" width="800" height="460"></canvas>
       <div class="row">
@@ -977,8 +1049,8 @@ const games = {
     const signs = [[340, 0, 'Mt. Wobblemore ⛰️ no refunds'], [1400, 235, 'Halfway-ish'], [2390, 684, 'Turn back?'], [2925, 875, 'Almost!!']];
     const taunts = ['Gravity: 1, You: 0', 'The mountain sends its regards.', 'Tricycles were not designed for this.', 'That was a learning experience.',
       'Wheee! (not the good kind)', 'Somewhere, a goat is laughing.', 'Have you tried NOT falling?', 'Back to the bottom, champ.'];
-    const G = 900, H = 1 / 240, DRIVE = 220, MAXC = .055, ALPHA = 30, REACT = .15, AIR = .25, JUMP = 320, KICK = 140;
-    let jumpCD = 0;
+    const G = 900, H = 1 / 240, DRIVE = 220, MAXC = .055, ALPHA = 30, REACT = .15, AIR = .25, JUMP = 320, KICK = 140, FLING = 520, FLING_CD = 1.5;
+    let jumpCD = 0, flingCD = 0, aim = null, onGround = false;
     const keys = {};
     let R, F, S, pts, L, cam, best, start, won, tauntShown, raf, acc, last;
     function reset() {
@@ -1012,6 +1084,7 @@ const games = {
     function step() {
       const pedal = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
       const grounded = pts.some(p => p.n);
+      onGround = grounded; flingCD -= H;
       // on the ground pedaling pops a little wheelie; in the air A/D tilt the trike
       const lean = grounded ? -pedal * REACT : pedal * AIR;
       jumpCD -= H;
@@ -1063,6 +1136,21 @@ const games = {
       b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
     });
     $('#mreset', el).addEventListener('click', reset);
+    // slingshot fling: drag back from anywhere on the canvas, release to launch
+    c.style.cursor = 'grab';
+    c.addEventListener('pointerdown', e => { aim = { a: canvasPos(c, e), b: canvasPos(c, e) }; c.setPointerCapture(e.pointerId); c.style.cursor = 'grabbing'; });
+    c.addEventListener('pointermove', e => { if (aim) aim.b = canvasPos(c, e); });
+    const release = () => {
+      if (!aim) return;
+      const dx = aim.a.x - aim.b.x, dy = aim.a.y - aim.b.y, len = Math.hypot(dx, dy);
+      if (len > 8 && onGround && flingCD <= 0) {
+        const pow = Math.min(len, 160) / 160 * FLING;
+        pts.forEach(p => { p.vx += dx / len * pow; p.vy += dy / len * pow; });
+        F.spin += 30; flingCD = FLING_CD;
+      }
+      aim = null; c.style.cursor = 'grab';
+    };
+    c.addEventListener('pointerup', release); c.addEventListener('pointercancel', release);
 
     const sx = x => x - cam.x + CW / 2, sy = y => y - cam.y + CH * .58;
     function draw(t) {
@@ -1118,6 +1206,17 @@ const games = {
       const hbx = F.x + (S.x - F.x) * .55, hby = F.y + (S.y - F.y) * .55;
       ctx.beginPath(); ctx.moveTo(sx(F.x), sy(F.y)); ctx.lineTo(sx(hbx), sy(hby)); ctx.stroke();
       wheel(R, '#cfd'); wheel(F, '#ffd84a');
+      if (aim) {
+        const dx = aim.a.x - aim.b.x, dy = aim.a.y - aim.b.y, len = Math.min(Math.hypot(dx, dy), 160);
+        const ready = onGround && flingCD <= 0, ox = sx(S.x), oy = sy(S.y);
+        if (len > 8) {
+          const ux = dx / Math.hypot(dx, dy), uy = dy / Math.hypot(dx, dy);
+          ctx.strokeStyle = ready ? '#e8364f' : 'rgba(80,80,80,.5)'; ctx.lineWidth = 4; ctx.setLineDash([8, 6]);
+          ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + ux * len * 1.2, oy + uy * len * 1.2); ctx.stroke(); ctx.setLineDash([]);
+          ctx.fillStyle = ctx.strokeStyle; ctx.font = 'bold 13px Trebuchet MS'; ctx.textAlign = 'center';
+          ctx.fillText(ready ? `FLING ${Math.round(len / 1.6)}%` : (onGround ? 'recharging…' : 'must be on the ground'), ox, oy - 40);
+        }
+      }
       ctx.save(); ctx.translate(sx(S.x), sy(S.y)); ctx.rotate(ang);
       ctx.font = '30px serif'; ctx.textBaseline = 'middle'; ctx.fillText('🧒', 0, -4); ctx.restore();
       ctx.textBaseline = 'alphabetic';
@@ -1214,7 +1313,13 @@ add(`<div class="pond" data-key="rink" style="left:40px;top:492px;width:330px;he
 </div>`);
 
 // town square, sign, garden, trees
-add(`<div class="fountain" style="left:533px;top:768px;width:130px;height:130px">⛲</div>`);
+add(`<div class="pond duckpond" data-key="ducks" style="left:526px;top:770px;width:144px;height:118px">
+  <span class="sign" style="top:-18px">🦆 Duck Pond</span>
+  <div class="orbit" style="animation-duration:9s"><span style="left:0;top:-30px;font-size:24px">🦆</span></div>
+  <div class="orbit" style="animation-duration:12s;animation-direction:reverse"><span style="left:42px;top:0;font-size:22px">🦆</span></div>
+  <div class="orbit" style="animation-duration:15s"><span style="left:-38px;top:12px;font-size:26px">🪿</span></div>
+  <span class="play-tag" style="bottom:-14px">🎮 Feed the Ducks</span>
+</div>`);
 add(`<div class="welcome" style="left:845px;top:770px">Welcome to 🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:13px">Population: 47 people &amp; 112 ducks</span></div>`);
 add(`<div class="tree" style="left:885px;top:850px;font-size:28px;letter-spacing:4px">🌷🌷🌼🌷🌷🌼🌷🌷</div>`);
 [[490, 770], [845, 870], [290, 200], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
