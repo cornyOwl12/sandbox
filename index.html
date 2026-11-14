@@ -1246,6 +1246,96 @@ const games = {
     reset(); raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }},
+  /* 🐼 Panda Gym */
+  gym: { title: '🐼 Panda Gym: Bamboo Workout', start(el) {
+    el.innerHTML = `<p class="hint">Coach Bao Bao needs a workout buddy! Hit the arrows (<b>arrow keys or WASD</b>) when they reach the line. Every hit is a rep. Miss and Bao Bao takes a snack break. 40 seconds!</p>
+      <div class="stats"><span id="gsc">💪 Reps: 0</span><span id="gcb">Combo: 0 (best 0)</span><span id="gtm">⏱ 40</span></div>
+      <canvas class="game" width="480" height="320"></canvas>
+      <div class="row">${['←', '↑', '↓', '→'].map((a, i) => `<button class="btn big" data-lane="${i}">${a}</button>`).join('')}</div>
+      <p class="msg" id="gmsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const LX = [50, 95, 140, 185], HIT = 262, ARROWS = ['←', '↑', '↓', '→'], COLORS = ['#e8364f', '#3aa0f0', '#3fb54a', '#ff9f43'];
+    const moves = ['Bicep curl!', 'Overhead press!', 'Deep squat!', 'Side stretch!'];
+    let notes, score, combo, bestCombo, time, over, raf, last, spawnT, speed, pose, poseT, tired, flash, pops;
+    function reset() { notes = []; score = 0; combo = 0; bestCombo = 0; time = 40; over = false; spawnT = 1; speed = 150; pose = -1; poseT = 0; tired = 0; flash = [0, 0, 0, 0]; pops = []; last = performance.now(); $('#gmsg', el).textContent = ''; }
+    function press(lane) {
+      if (over) { reset(); return; }
+      flash[lane] = .15;
+      let best = null, bd = 1e9;
+      for (const n of notes) if (n.lane === lane && !n.done) { const d = Math.abs(n.y - HIT); if (d < bd) { bd = d; best = n; } }
+      if (best && bd < 30) {
+        best.done = true; const perfect = bd < 12;
+        score += perfect ? 2 : 1; combo++; bestCombo = Math.max(bestCombo, combo);
+        pose = lane; poseT = .4; tired = 0;
+        pops.push({ x: LX[lane], y: HIT - 30, t: .8, txt: perfect ? 'PERFECT!' : 'Good' });
+      } else { combo = 0; pops.push({ x: LX[lane], y: HIT - 30, t: .6, txt: 'whiff' }); }
+    }
+    const kmap = { arrowleft: 0, a: 0, arrowup: 1, w: 1, arrowdown: 2, s: 2, arrowright: 3, d: 3 };
+    const kd = e => { const l = kmap[e.key.toLowerCase()]; if (l !== undefined && !e.repeat) { e.preventDefault(); press(l); } };
+    document.addEventListener('keydown', kd);
+    el.querySelectorAll('[data-lane]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); press(+b.dataset.lane); }));
+    c.addEventListener('pointerdown', () => { if (over) reset(); });
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (!over) {
+        time -= dt; spawnT -= dt; speed += dt * 3;
+        if (spawnT <= 0 && time > 1.5) { notes.push({ lane: Math.floor(rand(0, 4)), y: -20 }); spawnT = Math.max(.32, .8 - (40 - time) * .012) * rand(.8, 1.3); }
+        for (const n of notes) {
+          n.y += speed * dt;
+          if (!n.done && n.y > HIT + 32) { n.done = true; n.missed = true; combo = 0; tired = .7; pops.push({ x: LX[n.lane], y: HIT - 30, t: .6, txt: 'miss' }); }
+        }
+        notes = notes.filter(n => n.y < 340 && !(n.done && !n.missed));
+        if (time <= 0) {
+          time = 0; over = true;
+          $('#gmsg', el).textContent = score >= 60 ? `🏆 BEAST MODE! ${score} reps, best combo ${bestCombo}. Bao Bao is impressed. 🐼💪` : `${score} reps, best combo ${bestCombo}. Bao Bao says: "Not bad! Now, snack time." 🎋 (Click to go again)`;
+        }
+      }
+      poseT -= dt; tired -= dt; flash = flash.map(f => f - dt);
+      // gym background
+      ctx.fillStyle = '#f4efe6'; ctx.fillRect(0, 0, 480, 320);
+      ctx.fillStyle = '#e4dccd'; for (let x = 0; x < 480; x += 40) ctx.fillRect(x, 0, 2, 230);
+      ctx.fillStyle = '#c99a5b'; ctx.fillRect(0, 230, 480, 90);
+      ctx.fillStyle = 'rgba(0,0,0,.06)'; for (let x = 0; x < 480; x += 60) ctx.fillRect(x, 230, 2, 90);
+      ctx.fillStyle = '#cfe9f5'; ctx.fillRect(260, 30, 190, 120); ctx.strokeStyle = '#999'; ctx.lineWidth = 4; ctx.strokeRect(260, 30, 190, 120);
+      ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 14px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText('NO PAIN, NO BAMBOO', 355, 20);
+      ctx.font = '26px serif'; ctx.fillText('🎋', 450, 222); ctx.fillText('🥤', 270, 222); ctx.fillText('🏋️', 300, 222);
+      // lanes
+      ctx.fillStyle = 'rgba(43,29,58,.08)'; ctx.fillRect(25, 0, 185, 320);
+      for (let i = 0; i < 4; i++) {
+        ctx.strokeStyle = COLORS[i]; ctx.lineWidth = 3; ctx.globalAlpha = flash[i] > 0 ? 1 : .45;
+        ctx.beginPath(); ctx.arc(LX[i], HIT, 19, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+        ctx.fillStyle = COLORS[i]; ctx.globalAlpha = .45; ctx.font = 'bold 20px Trebuchet MS'; ctx.textBaseline = 'middle'; ctx.fillText(ARROWS[i], LX[i], HIT + 1); ctx.globalAlpha = 1;
+      }
+      for (const n of notes) {
+        if (n.done) continue;
+        ctx.fillStyle = COLORS[n.lane]; ctx.beginPath(); ctx.arc(LX[n.lane], n.y, 17, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Trebuchet MS'; ctx.fillText(ARROWS[n.lane], LX[n.lane], n.y + 1);
+      }
+      // panda
+      ctx.save(); ctx.translate(355, 200);
+      let prop = null;
+      if (tired > 0) { ctx.rotate(.25); ctx.font = '80px serif'; ctx.fillText('🐼', 0, -20); ctx.restore(); ctx.font = '24px serif'; ctx.fillText('🎋', 400, 175); ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 14px Trebuchet MS'; ctx.fillText('snack break…', 355, 110); }
+      else {
+        const k = poseT > 0 ? Math.sin((1 - poseT / .4) * Math.PI) : 0;
+        if (pose === 0 && poseT > 0) { prop = ['💪', 46, -20 - k * 20]; }
+        if (pose === 1 && poseT > 0) { ctx.translate(0, -k * 18); prop = ['🏋️', 0, -78 - k * 10]; }
+        if (pose === 2 && poseT > 0) { ctx.scale(1 + k * .12, 1 - k * .22); }
+        if (pose === 3 && poseT > 0) { ctx.rotate(-k * .35); }
+        if (poseT <= 0) ctx.translate(0, Math.sin(t / 250) * 3);
+        ctx.font = '80px serif'; ctx.fillText('🐼', 0, -20);
+        if (prop) { ctx.font = '34px serif'; ctx.fillText(prop[0], prop[1], prop[2]); }
+        ctx.restore();
+        if (poseT > 0 && pose >= 0) { ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 15px Trebuchet MS'; ctx.fillText(moves[pose], 355, 110); }
+      }
+      ctx.textBaseline = 'alphabetic';
+      pops.forEach(p => { p.t -= dt; p.y -= 30 * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.fillStyle = p.txt === 'PERFECT!' ? '#e8364f' : '#2b1d3a'; ctx.font = 'bold 13px Trebuchet MS'; ctx.fillText(p.txt, p.x, p.y); ctx.globalAlpha = 1; });
+      pops = pops.filter(p => p.t > 0);
+      $('#gsc', el).textContent = '💪 Reps: ' + score; $('#gcb', el).textContent = `Combo: ${combo} (best ${bestCombo})`; $('#gtm', el).textContent = '⏱ ' + Math.ceil(time);
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); };
+  }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
     el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
@@ -1477,7 +1567,7 @@ for (let i = 0; i < 40; i++) add(`<span class="star" style="left:${rand(0, 1200)
 add(`<div class="road v" style="left:566px;top:190px;width:64px;height:564px"></div>`);
 add(`<div class="road h" style="left:0;top:410px;width:1200px;height:64px"></div>`);
 add(`<div class="road h" style="left:0;top:690px;width:1200px;height:64px"></div>`);
-add(`<div class="street-sign" style="left:470px;top:388px">Tulip Ave</div>`);
+add(`<div class="street-sign" style="left:300px;top:388px">Tulip Ave</div>`);
 add(`<div class="street-sign" style="left:250px;top:668px">Pie Lane</div>`);
 add(`<div class="street-sign" style="left:636px;top:296px">Crayon Blvd</div>`);
 
@@ -1507,6 +1597,7 @@ const places = [
   { key: 'checkers', x: 678, y: 762, w: 150, h: 108, roofH: 38, roof: '#22223a', wall: 'repeating-conic-gradient(#fff 0 25%, #f3c4c4 0 50%) 0 0/24px 24px', emoji: '🔴⚫', size: 26, name: 'Checkers Club', tag: 'Checkers Match' },
   { key: 'zombies', x: 70, y: 62, w: 190, h: 143, roofH: 50, roof: '#3b2a4d', wall: '#7d8a76', win: '#a6ff8f', emoji: '🧟', size: 40, name: 'Chill Zombie Manor', tag: 'Explore' },
   { key: 'casino', x: 1010, y: 760, w: 172, h: 112, roofH: 36, style: 'flat', roof: 'linear-gradient(90deg,#2f9e44,#ffd84a,#2f9e44)', wall: '#1f4d2e', win: '#9dff8a', emoji: '🍀🎰', size: 34, name: 'Lucky Clover Casino', tag: '🔒 Locked' },
+  { key: 'gym', x: 424, y: 244, w: 128, h: 144, roofH: 40, style: 'flat', roof: '#222', wall: 'linear-gradient(#ffffff 0 55%, #1d1d1d 55%)', emoji: '🐼', size: 40, name: 'Panda Gym', tag: 'Bamboo Workout' },
   { key: 'penny', x: 300, y: 762, w: 190, h: 108, roofH: 38, roof: '#b8692e', wall: '#f6d9b8', emoji: '🪙', size: 34, name: 'The Penny House', tag: 'Penny Press' },
   { key: 'socks', x: 60, y: 762, w: 200, h: 108, roofH: 38, roof: '#3aa0f0', wall: '#e6f4ff', emoji: '🧦', size: 34, name: 'Lost Sock Office', tag: 'Match the Pairs' },
 ];
@@ -1528,11 +1619,11 @@ add(`<div class="paddock orchard" data-key="orchard" style="left:282px;top:104px
 </div>`);
 
 // horse paddock (part of the stables)
-add(`<div class="paddock" data-key="stable" style="left:236px;top:236px;width:305px;height:150px">
+add(`<div class="paddock" data-key="stable" style="left:226px;top:240px;width:180px;height:146px">
   <span class="sign" style="top:-16px">🐎 Paddock</span>
-  <span class="mover" style="left:30px;top:40px;--d:180px;animation:pace 7s ease-in-out infinite"><span style="display:inline-block;animation:paceflip 7s steps(1) infinite">🐎</span></span>
-  <span class="mover" style="left:60px;top:90px;--d:140px;animation:pace 9s ease-in-out infinite -3s"><span style="display:inline-block;animation:paceflip 9s steps(1) infinite -3s">🐴</span></span>
-  <span class="mover" style="left:240px;top:20px;font-size:26px">🌾</span>
+  <span class="mover" style="left:30px;top:40px;--d:90px;animation:pace 7s ease-in-out infinite"><span style="display:inline-block;animation:paceflip 7s steps(1) infinite">🐎</span></span>
+  <span class="mover" style="left:40px;top:90px;--d:70px;animation:pace 9s ease-in-out infinite -3s"><span style="display:inline-block;animation:paceflip 9s steps(1) infinite -3s">🐴</span></span>
+  <span class="mover" style="left:140px;top:16px;font-size:24px">🌾</span>
 </div>`);
 
 // frozen pond rink with skaters going round
@@ -1553,7 +1644,7 @@ add(`<div class="pond duckpond" data-key="ducks" style="left:526px;top:770px;wid
 </div>`);
 add(`<div class="welcome" style="left:842px;top:766px;width:150px;font-size:13px;padding:6px 8px">Welcome to<br>🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:11px">Pop. 47 people &amp; 112 ducks</span></div>`);
 add(`<div class="tree" style="left:842px;top:862px;font-size:20px;letter-spacing:2px">🌷🌼🌷🌼🌷🌼</div>`);
-[[490, 770], [290, 200], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
+[[490, 770], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
   .forEach(([x, y]) => add(`<span class="tree" style="left:${x}px;top:${y}px">${pick(['🌳', '🌲', '🌳'])}</span>`));
 
 // traffic
