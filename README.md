@@ -7,7 +7,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🐴 Hoofbeat Stables | Pony Derby: mash to win the race |
 | ⛸️ Frosty Loop Rink | Snowflake Catch: catch ❄️ and ⭐, dodge 🐧 |
 | 🍋 Lulu's Lemonade | Lemonade Rush: make the right cup, fast |
-| 🖍️ Museum of Crayons | Draw a masterpiece and hang it in the gallery |
+| 🖍️ Museum of Crayons | Art Studio: crayon, marker, rainbow, glitter, fill, stickers, mirror mode, undo/redo, daily themes and a curator who rates your art |
 | 🎩 Hats Hats Hats | Hat Rush: give customers the hat they want |
 | 🛋️ Couch-Making Academy | Cushion Stacker: build the tallest couch |
 | 🧦 Lost Sock Office | Memory match: reunite the pairs |
