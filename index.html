@@ -208,6 +208,29 @@
   .sizer { display: flex; align-items: center; gap: 6px; font-weight: bold; }
   .gallery figure { margin: 0; text-align: center; font-size: 11px; width: 130px; }
   .gallery figure img { width: 120px; }
+  .tinypiano { position: absolute; z-index: 4; width: 64px; }
+  .tp-lid { height: 10px; background: #1d1d1d; border-radius: 5px 5px 0 0; margin: 0 -3px; }
+  .tp-keys { position: relative; display: flex; height: 22px; border: 2px solid #1d1d1d; border-top: none; background: #1d1d1d; }
+  .tpw { width: 8px; height: 100%; background: #fff; border-right: 1px solid #999; cursor: pointer; }
+  .tpw.down { background: #ffe27a; }
+  .tpb { position: absolute; top: 0; width: 5px; height: 13px; background: #111; cursor: pointer; z-index: 2; border-radius: 0 0 1px 1px; }
+  .tpb.down { background: #e8364f; }
+  .tp-legs { height: 8px; margin: 0 4px; border-left: 3px solid #1d1d1d; border-right: 3px solid #1d1d1d; }
+  .tp-open { position: absolute; left: 50%; bottom: -22px; transform: translateX(-50%); white-space: nowrap; background: #ffe27a; border: 2px solid var(--ink); border-radius: 999px; font: inherit; font-size: 11px; font-weight: bold; padding: 0 7px; cursor: pointer; }
+  .bigkeys { position: relative; height: 170px; background: #1d1d1d; border-radius: 10px; padding: 0; overflow: hidden; border: 4px solid #1d1d1d; user-select: none; touch-action: none; }
+  .wk, .bk { position: absolute; top: 0; border: none; padding: 0; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; font: inherit; }
+  .wk { height: 100%; background: linear-gradient(#fff, #eee); border-right: 1px solid #bbb; border-radius: 0 0 6px 6px; }
+  .bk { height: 60%; background: linear-gradient(#333, #111); z-index: 2; border-radius: 0 0 4px 4px; color: #fff; }
+  .wk span, .bk span { font-size: 11px; font-weight: bold; opacity: .55; margin-bottom: 6px; }
+  .wk.down { background: #ffe27a; } .bk.down { background: #e8364f; }
+  .namebox { font: inherit; padding: 7px 10px; border: 2px solid var(--ink); border-radius: 10px; width: 150px; }
+  #rec.recording { background: #ff8a8a; animation: twinkle 1s infinite; }
+  .songs { display: grid; gap: 6px; }
+  .song { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 5px 8px; flex-wrap: wrap; }
+  .song small { opacity: .6; }
+  .btn.del { background: #ffd1d1; padding: 4px 9px; }
+  .btn.del.confirm { background: #e8364f; color: #fff; }
+  .gallery figure .del { margin-top: 4px; font-size: 12px; }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -327,6 +350,22 @@ function updateHud() {
     cas.classList.toggle('locked', !save.key);
     const tag = cas.querySelector('.play-tag'); if (tag) tag.textContent = save.key ? '🎮 Skin Slots' : '🔒 Locked';
   }
+}
+
+/* ---------------- tiny synth for the piano ---------------- */
+let AC = null;
+function playNote(midi, dur = 1.3) {
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime, f = 440 * Math.pow(2, (midi - 69) / 12);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.28, t + .008); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    const o1 = AC.createOscillator(), o2 = AC.createOscillator(), g2 = AC.createGain();
+    o1.type = 'triangle'; o1.frequency.value = f; o2.type = 'sine'; o2.frequency.value = f * 2; g2.gain.value = .22;
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(AC.destination);
+    o1.start(t); o2.start(t); o1.stop(t + dur); o2.stop(t + dur);
+  } catch (e) {}
 }
 
 /* ---------------- games ---------------- */
@@ -597,9 +636,16 @@ const games = {
     document.addEventListener('keydown', kd);
 
     function renderGallery() {
-      $('#gallery', el).innerHTML = gallery.length ? gallery.map(g => `<figure><img src="${g.img}" alt="${g.theme}"><figcaption>"${g.theme}"<br>${'⭐'.repeat(g.stars)}</figcaption></figure>`).join('')
+      $('#gallery', el).innerHTML = gallery.length ? gallery.map((g, i) => `<figure><img src="${g.img}" alt="${g.theme}"><figcaption>"${g.theme}"<br>${'⭐'.repeat(g.stars)}</figcaption><button class="btn del" data-del="${i}" title="Delete this artwork">🗑</button></figure>`).join('')
         : '<p class="hint" style="margin:0">No art yet. The walls are sad. Hang something!</p>';
     }
+    $('#gallery', el).addEventListener('click', e => {
+      const d = e.target.closest('[data-del]'); if (!d) return;
+      if (!d.classList.contains('confirm')) { d.classList.add('confirm'); d.textContent = 'Delete? 🗑'; setTimeout(() => { if (d.isConnected) { d.classList.remove('confirm'); d.textContent = '🗑'; } }, 3000); return; }
+      gallery.splice(+d.dataset.del, 1);
+      try { localStorage.setItem('tulipPIE_gallery', JSON.stringify(gallery)); } catch (err) {}
+      renderGallery(); $('#review', el).textContent = '🗑 Artwork removed from the museum. The curator sheds a single tear.';
+    });
     $('#hang', el).addEventListener('click', () => {
       // tiny "art critic": count how much of the canvas is used and how many colors
       const d = ctx.getImageData(0, 0, W, H).data; let ink = 0; const cols = new Set();
@@ -1480,6 +1526,89 @@ const games = {
     reset(); raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); };
   }},
+  /* 🎹 Tiny Piano: big mode with recording */
+  piano: { title: '🎹 The Tiny Piano (big mode)', start(el) {
+    const whites = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84];
+    const blacks = [61, 63, 66, 68, 70, 73, 75, 78, 80, 82];
+    const wKeys = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'", 'z', 'x', 'c', 'v'];
+    const bKeys = ['w', 'e', 't', 'y', 'u', 'o', 'p', '[', ']', '\\'];
+    const keyToMidi = {}; wKeys.forEach((k, i) => keyToMidi[k] = whites[i]); bKeys.forEach((k, i) => keyToMidi[k] = blacks[i]);
+    const label = {}; Object.entries(keyToMidi).forEach(([k, m]) => label[m] = k.toUpperCase());
+    const demo = { name: 'Twinkle Twinkle (demo)', demo: true, notes: [60, 60, 67, 67, 69, 69, 67, -1, 65, 65, 64, 64, 62, 62, 60].map((m, i) => [m, i * 420]).filter(n => n[0] > 0) };
+    let songs = []; try { songs = JSON.parse(localStorage.getItem('tulipPIE_songs') || '[]'); } catch (e) {}
+    el.innerHTML = `<p class="hint">Click the keys or use your keyboard (letters are on the keys). Hit <b>⏺ Record</b>, play something, then <b>⏹ Stop</b> and save it!</p>
+      <div class="bigkeys" id="bk"></div>
+      <div class="row">
+        <button class="btn" id="rec">⏺ Record</button>
+        <button class="btn" id="playTake" disabled>▶ Play recording</button>
+        <input id="songName" class="namebox" maxlength="30" placeholder="Song name…">
+        <button class="btn" id="saveSong" disabled>💾 Save song</button>
+      </div>
+      <p class="msg" id="pmsg"></p>
+      <h3 style="margin:8px 0 6px">🎼 My Songs</h3><div class="songs" id="songs"></div>`;
+    const bk = $('#bk', el);
+    const W = 100 / whites.length;
+    bk.innerHTML = whites.map((m, i) => `<button class="wk" data-m="${m}" style="left:${i * W}%;width:${W}%"><span>${label[m]}</span></button>`).join('') +
+      blacks.map(m => { const i = whites.indexOf(m - 1); return `<button class="bk" data-m="${m}" style="left:${(i + 1) * W - W * .32}%;width:${W * .64}%"><span>${label[m]}</span></button>`; }).join('');
+    let rec = null, take = null, timers = [];
+    const keyEl = m => bk.querySelector(`[data-m="${m}"]`);
+    function hit(m, fromUser) {
+      playNote(m);
+      const k = keyEl(m); if (k) { k.classList.add('down'); setTimeout(() => k.classList.remove('down'), 160); }
+      if (fromUser && rec && rec.notes.length < 3000) rec.notes.push([m, Math.round(performance.now() - rec.start)]);
+    }
+    bk.addEventListener('pointerdown', e => { const k = e.target.closest('[data-m]'); if (k) { e.preventDefault(); hit(+k.dataset.m, true); } });
+    const kd = e => {
+      if (e.target.id === 'songName' || e.repeat || e.ctrlKey || e.metaKey) return;
+      const m = keyToMidi[e.key.toLowerCase()]; if (m) { e.preventDefault(); hit(m, true); }
+    };
+    document.addEventListener('keydown', kd);
+    function stopPlayback() { timers.forEach(clearTimeout); timers = []; }
+    function playSong(notes, who) {
+      stopPlayback();
+      $('#pmsg', el).textContent = `🎶 Playing ${who}…`;
+      const t0 = notes.length ? notes[0][1] : 0;
+      notes.forEach(([m, t]) => timers.push(setTimeout(() => hit(m, false), t - t0)));
+      const end = notes.length ? notes[notes.length - 1][1] - t0 + 600 : 0;
+      timers.push(setTimeout(() => $('#pmsg', el).textContent = '', end));
+    }
+    $('#rec', el).addEventListener('click', () => {
+      if (!rec) { stopPlayback(); rec = { start: performance.now(), notes: [] }; $('#rec', el).textContent = '⏹ Stop'; $('#rec', el).classList.add('recording'); $('#pmsg', el).textContent = '🔴 Recording… play something!'; }
+      else {
+        take = rec.notes; rec = null; $('#rec', el).textContent = '⏺ Record'; $('#rec', el).classList.remove('recording');
+        $('#pmsg', el).textContent = take.length ? `Recorded ${take.length} notes. Give it a name and save it!` : 'Nothing recorded. Play some keys while recording!';
+        $('#playTake', el).disabled = $('#saveSong', el).disabled = !take.length;
+      }
+    });
+    $('#playTake', el).addEventListener('click', () => take && playSong(take, 'your recording'));
+    $('#saveSong', el).addEventListener('click', () => {
+      if (!take || !take.length) return;
+      const name = $('#songName', el).value.trim() || `Song #${songs.length + 1}`;
+      songs.unshift({ name, notes: take });
+      try { localStorage.setItem('tulipPIE_songs', JSON.stringify(songs)); } catch (e) { $('#pmsg', el).textContent = 'Could not save (storage full?)'; return; }
+      $('#pmsg', el).textContent = `💾 Saved "${name}"!`; $('#songName', el).value = ''; take = null;
+      $('#playTake', el).disabled = $('#saveSong', el).disabled = true;
+      renderSongs();
+    });
+    function renderSongs() {
+      const list = [...songs, demo];
+      $('#songs', el).innerHTML = list.map((s, i) => `<div class="song"><span>🎵 <b>${s.name.replace(/[<>&]/g, '')}</b> <small>(${s.notes.length} notes)</small></span>
+        <span><button class="btn" data-play="${i}">▶ Play</button>${s.demo ? '' : ` <button class="btn del" data-del="${i}">🗑</button>`}</span></div>`).join('');
+      $('#songs', el).dataset.count = list.length;
+      $('#songs', el)._list = list;
+    }
+    $('#songs', el).addEventListener('click', e => {
+      const list = $('#songs', el)._list;
+      const p = e.target.closest('[data-play]'); if (p) { const s = list[+p.dataset.play]; playSong(s.notes, `"${s.name}"`); return; }
+      const d = e.target.closest('[data-del]'); if (!d) return;
+      if (!d.classList.contains('confirm')) { d.classList.add('confirm'); d.textContent = 'Delete? 🗑'; setTimeout(() => { if (d.isConnected) { d.classList.remove('confirm'); d.textContent = '🗑'; } }, 3000); return; }
+      songs.splice(+d.dataset.del, 1);
+      try { localStorage.setItem('tulipPIE_songs', JSON.stringify(songs)); } catch (e) {}
+      renderSongs(); $('#pmsg', el).textContent = '🗑 Song deleted.';
+    });
+    renderSongs();
+    return () => { stopPlayback(); document.removeEventListener('keydown', kd); };
+  }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
     el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
@@ -1762,6 +1891,17 @@ add(`<div class="paddock orchard" data-key="orchard" style="left:282px;top:104px
   <span class="play-tag" style="bottom:-12px">🎮 Spoon Harvest</span>
 </div>`);
 
+// a super tiny piano, just sitting out on the grass
+(() => {
+  const whites = [60, 62, 64, 65, 67, 69, 71, 72], blacks = [[61, 0], [63, 1], [66, 3], [68, 4], [70, 5]];
+  add(`<div class="tinypiano" style="left:448px;top:476px">
+    <div class="tp-lid"></div>
+    <div class="tp-keys">${whites.map(m => `<span class="tpw" data-note="${m}"></span>`).join('')}${blacks.map(([m, i]) => `<span class="tpb" data-note="${m}" style="left:${(i + 1) * 8 - 2.5}px"></span>`).join('')}</div>
+    <div class="tp-legs"></div>
+    <button class="tp-open" data-key="piano">🎵 big piano</button>
+  </div>`);
+})();
+
 // horse paddock (part of the stables)
 add(`<div class="paddock" data-key="stable" style="left:226px;top:240px;width:180px;height:146px">
   <span class="sign" style="top:-16px">🐎 Paddock</span>
@@ -1831,7 +1971,7 @@ function openGame(key) {
   closeGame();
   const g = games[key];
   $('#mtitle').textContent = g.title;
-  $('.panel').classList.toggle('wide', key === 'mountain' || key === 'zombies' || key === 'crayon');
+  $('.panel').classList.toggle('wide', ['mountain', 'zombies', 'crayon', 'piano'].includes(key));
   $('#modal').classList.remove('hidden');
   cleanup = g.start($('#game')) || null;
 }
@@ -1856,12 +1996,16 @@ $('#modal').addEventListener('pointerdown', e => { if (e.target.id === 'modal') 
 town.addEventListener('click', e => {
   const b = e.target.closest('[data-key]');
   if (!b) return;
-  lastPlace = rectOf(b);
+  lastPlace = b.dataset.key === 'piano' ? null : rectOf(b);
   openGame(b.dataset.key);
+});
+town.addEventListener('pointerdown', e => {
+  const k = e.target.closest('[data-note]'); if (!k) return;
+  playNote(+k.dataset.note); k.classList.add('down'); setTimeout(() => k.classList.remove('down'), 150);
 });
 document.addEventListener('pointerdown', e => {
   if (!$('#modal').classList.contains('hidden')) return;
-  if (e.target.closest('[data-key], #modal')) return;
+  if (e.target.closest('[data-key], #modal, .tinypiano')) return;
   launch(e.clientX, e.clientY);
 });
 
@@ -1870,7 +2014,7 @@ const playerEl = $('#player');
 const player = { x: 700, y: 748 };
 const keys = {};
 const rectOf = el => ({ x: parseFloat(el.style.left), y: parseFloat(el.style.top), w: parseFloat(el.style.width), h: parseFloat(el.style.height), key: el.dataset.key });
-const solids = () => [...town.querySelectorAll('[data-key]')].map(rectOf);
+const solids = () => [...town.querySelectorAll('[data-key]')].map(rectOf).filter(r => !isNaN(r.x));
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeGame(); return; }
   if (!$('#modal').classList.contains('hidden')) return;

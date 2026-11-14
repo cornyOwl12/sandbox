@@ -18,6 +18,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🦆 Duck Pond | Feed the Ducks before Gerald the goose steals the bread |
 | 🧟 Chill Zombie Manor | Explore a house of chill zombies. Avoid Granny Grumbles 👵 (and find the key 🔑) |
 | 🐼 Panda Gym | Bamboo Workout: a rhythm game with Coach Bao Bao |
+| 🎹 Tiny Piano | Out on the grass. Click its teeny keys, or open big mode to record, save and replay songs |
 | 🥄 Spoon Orchard | Spoon Harvest: pick ripe spoons, grab golden ones, avoid the forks |
 | 🎰 Lucky Clover Casino | Locked until you find the key. Spend race coins on skin slots, then pick a skin in the wardrobe |
 
