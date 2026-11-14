@@ -175,6 +175,20 @@
   .sq.sel { background: #e6b422; } .sq.target { background: #5fae55; box-shadow: inset 0 0 0 3px #fff8; }
   .pc { width: 78%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -4px 0 rgba(0,0,0,.3), 0 2px 0 rgba(0,0,0,.35); }
   .pc.r { background: radial-gradient(circle at 40% 35%, #ff6b6b, #c4182f); } .pc.b { background: radial-gradient(circle at 40% 35%, #555, #151515); }
+  #hud { position: fixed; top: 10px; left: 10px; z-index: 40; display: flex; gap: 8px; pointer-events: none; }
+  #hud span { background: rgba(255,248,236,.92); border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; font-weight: bold; font-size: 14px; }
+  .bldg.locked { filter: grayscale(.75) brightness(.85); }
+  .bldg.locked::after { content: "🔒"; position: absolute; right: -12px; top: -14px; font-size: 34px; z-index: 5; filter: drop-shadow(0 3px 0 rgba(0,0,0,.3)); }
+  .bldg.locked:hover { filter: grayscale(.6) brightness(.95); }
+  .slot { background: linear-gradient(#ffd84a, #e6a400); border: 4px solid var(--ink); border-radius: 18px; padding: 14px; text-align: center; box-shadow: inset 0 -6px 0 rgba(0,0,0,.2); }
+  .reels { display: flex; gap: 10px; justify-content: center; margin-bottom: 12px; }
+  .reel { width: 86px; height: 96px; background: #fff; border: 3px solid var(--ink); border-radius: 12px; font-size: 54px; display: flex; align-items: center; justify-content: center; }
+  .reel.spinning { filter: blur(1.5px); }
+  .wardrobe { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+  .skin { font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; border: 2px solid var(--ink); background: #fff; cursor: pointer; }
+  .skin span { font-size: 32px; } .skin small { font-size: 10px; font-weight: bold; }
+  .skin.rare { background: #e3f1ff; } .skin.legendary { background: #fff1c2; } .skin.unowned { opacity: .5; cursor: default; }
+  .skin.on { outline: 3px solid #e8364f; outline-offset: 2px; }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -205,6 +219,7 @@
   <div id="town"></div>
   <div id="player">🧒</div>
 </div>
+<div id="hud"></div>
 <div id="help">🧒 Arrow keys / WASD to walk • Bump into or click a building to play • Click the sky or grass for fireworks</div>
 
 <div id="modal" class="hidden" role="dialog" aria-modal="true">
@@ -270,6 +285,31 @@ function burst(x, y, hue) {
   requestAnimationFrame(fxLoop);
 })();
 
+/* ---------------- save data (coins, key, skins) ---------------- */
+const SKINS = [
+  { e: '🧒', n: 'Classic Kid', r: 'starter' },
+  { e: '🌭', n: 'Hot Dog', r: 'common' }, { e: '🧻', n: 'Tissue Paper', r: 'common' }, { e: '🥔', n: 'Potato', r: 'common' },
+  { e: '🍌', n: 'Banana', r: 'common' }, { e: '🧽', n: 'Sponge', r: 'common' }, { e: '🪣', n: 'Bucket', r: 'common' },
+  { e: '📻', n: 'Walkie-Talkie', r: 'rare' }, { e: '🦖', n: 'Dino', r: 'rare' }, { e: '🍕', n: 'Pizza Slice', r: 'rare' },
+  { e: '🐸', n: 'Froggy', r: 'rare' }, { e: '🤖', n: 'Robot', r: 'rare' },
+  { e: '👻', n: 'Ghost', r: 'legendary' }, { e: '🦄', n: 'Unicorn', r: 'legendary' }, { e: '🧟', n: 'Zombie', r: 'legendary' },
+];
+const save = (() => {
+  const d = { coins: 0, key: false, skins: ['🧒'], skin: '🧒' };
+  try { return Object.assign(d, JSON.parse(localStorage.getItem('tulipPIE') || '{}')); } catch (e) { return d; }
+})();
+function persist() { try { localStorage.setItem('tulipPIE', JSON.stringify(save)); } catch (e) {} updateHud(); }
+function updateHud() {
+  const hud = document.getElementById('hud');
+  if (hud) hud.innerHTML = `<span>🪙 ${save.coins}</span><span>${save.key ? '🔑 Key found' : '🔑 ???'}</span><span>${save.skin}</span>`;
+  const p = document.getElementById('player'); if (p) p.textContent = save.skin;
+  const cas = document.querySelector('[data-key="casino"]');
+  if (cas) {
+    cas.classList.toggle('locked', !save.key);
+    const tag = cas.querySelector('.play-tag'); if (tag) tag.textContent = save.key ? '🎮 Skin Slots' : '🔒 Locked';
+  }
+}
+
 /* ---------------- games ---------------- */
 const galleryImgs = [];
 const games = {
@@ -293,7 +333,8 @@ const games = {
       const w = pos.findIndex(p => p >= 100);
       if (w < 0) return;
       state = 'done'; clearInterval(iv);
-      msg.textContent = w === 0 ? '🏆 Sir Neighs-a-Lot wins! You are a champion jockey!' : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
+      if (w === 0) { save.coins++; persist(); }
+      msg.textContent = w === 0 ? `🏆 Sir Neighs-a-Lot wins! +1 🪙 coin (you have ${save.coins}). Spend it at the casino!` : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
       btn.textContent = 'Race again';
     }
     function gallop() { if (state === 'run') { pos[0] += 2.1; check(); draw(); } else if (state === 'done') countdown(); }
@@ -820,7 +861,7 @@ const games = {
       ['📚', 45, 45, 30], ['📚', 85, 45, 30], ['📚', 125, 45, 30], ['🕯️', 210, 50, 24], ['🛏️', 200, 200, 0],
       ['🛁', 300, 80, 46], ['🚽', 300, 205, 30], ['🧻', 340, 205, 18],
       ['🎹', 410, 55, 38], ['🥁', 545, 205, 32], ['🎺', 545, 50, 24],
-      ['🪑', 700, 95, 40], ['🧶', 740, 140, 22], ['🖼️', 640, 40, 26], ['🐈‍⬛', 610, 210, 26], ['🍬', 760, 210, 18], ['🛏️', 745, 60, 36],
+      ['🪑', 700, 95, 40], ['🧶', 740, 140, 22], ['🖼️', 640, 40, 26], ['🐈‍⬛', 610, 210, 26], ['🍬', 610, 175, 18], ['🛏️', 745, 60, 36],
     ];
     const Z = (name, e, x, y, b, lines, still) => ({ name, e, x, y, hx: x, hy: y, b, lines, li: 0, still, tx: x, ty: y, wait: rand(0, 2), near: false });
     const zs = [
@@ -893,12 +934,13 @@ const games = {
       // granny
       const gd = Math.hypot(granny.x - player.x, granny.y - player.y);
       if (inGranny()) {
-        if (granny.state !== 'chase' && gd < 105) { granny.state = 'chase'; granny.li = Math.floor(rand(0, grannyChase.length)); }
+        if ((granny.state === 'sit' || granny.state === 'home') && gd < 95) { granny.state = 'rise'; granny.rise = 1.1; granny.li = Math.floor(rand(0, grannyChase.length)); }
+        if (granny.state === 'rise' && (granny.rise -= dt) <= 0) granny.state = 'chase';
         else if (granny.state === 'sit' || granny.state === 'home') granny.state = granny.state === 'home' ? 'home' : 'sit';
-      } else if (granny.state === 'chase') granny.state = 'home';
+      } else if (granny.state === 'chase' || granny.state === 'rise') granny.state = 'home';
       if (granny.state === 'chase') {
         const ddx = player.x - granny.x, ddy = player.y - granny.y;
-        granny.x += ddx / gd * 112 * dt; granny.y += ddy / gd * 112 * dt;
+        granny.x += ddx / gd * 100 * dt; granny.y += ddy / gd * 100 * dt;
         granny.x = Math.max(granny.b[0], Math.min(granny.b[0] + granny.b[2], granny.x));
         granny.y = Math.max(granny.b[1], Math.min(granny.b[1] + granny.b[3], granny.y));
         if (gd < 26) {
@@ -914,6 +956,10 @@ const games = {
         else { granny.x += ddx / d * 60 * dt; granny.y += ddy / d * 60 * dt; }
       }
       if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('#zmsg', el).textContent = ''; }
+      if (!save.key && Math.hypot(player.x - 762, player.y - 222) < 24) {
+        save.key = true; persist();
+        $('#zmsg', el).textContent = '🔑 You grabbed the casino key from Granny\'s room! The Lucky Clover Casino is now OPEN.'; msgT = 6;
+      }
       const room = roomAt(player.x, player.y); if (room) $('#zroom', el).textContent = '📍 ' + room.n;
 
       // ---- draw ----
@@ -929,10 +975,11 @@ const games = {
       ctx.fillStyle = '#4a3a5c'; walls.forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
       decor.forEach(([e, x, y, s]) => s && emoji(e, x, y, s));
       emoji('🦆', 318, 64, 16);
+      if (!save.key) { ctx.save(); ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 12 + Math.sin(t / 200) * 6; emoji('🔑', 762, 222, 22); ctx.restore(); }
       // rocking chair rock
       const sprites = [...zs.map(z => ({ ...z, kind: 'z' })), { ...granny, kind: 'g' }, { ...player, kind: 'p' }].sort((a, b) => a.y - b.y);
       for (const s of sprites) {
-        if (s.kind === 'p') { emoji('🧒', s.x, s.y - 6, 30); continue; }
+        if (s.kind === 'p') { emoji(save.skin, s.x, s.y - 6, 30); continue; }
         if (s.kind === 'g') {
           const rock = s.state === 'sit' ? Math.sin(t / 300) * .12 : Math.sin(t / 60) * .15;
           ctx.save(); ctx.translate(s.x, s.y - 8); ctx.rotate(rock);
@@ -949,7 +996,7 @@ const games = {
       }
       // bubbles on top
       for (const z of zs) if (z.near) bubble(z.x, z.y, `${z.name}: ${z.lines[z.li]}`);
-      if (inGranny()) bubble(granny.x, granny.y, granny.state === 'chase' ? `👵 ${grannyChase[granny.li]}` : `👵 ${grannyIdle[Math.floor(t / 2600) % grannyIdle.length]}`, '#ffd1d1');
+      if (inGranny()) bubble(granny.x, granny.y, granny.state === 'rise' ? '👵 Hmph?! WHO\'S THERE?! (getting up...)' : granny.state === 'chase' ? `👵 ${grannyChase[granny.li]}` : `👵 ${grannyIdle[Math.floor(t / 2600) % grannyIdle.length]}`, '#ffd1d1');
       raf = requestAnimationFrame(loop);
     }
     raf = requestAnimationFrame(loop);
@@ -1025,6 +1072,83 @@ const games = {
     }
     reset(); raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
+  }},
+  /* 🎰 Lucky Clover Casino */
+  casino: { title: '🎰 Lucky Clover Casino', start(el) {
+    if (!save.key) {
+      $('#mtitle').textContent = '🔒 Lucky Clover Casino (CLOSED)';
+      el.innerHTML = `<div style="text-align:center;font-size:70px">⛓️🚪⛓️</div>
+        <p style="text-align:center;font-size:1.05rem">The doors are chained shut. A note is taped to the door:</p>
+        <p style="text-align:center;font-style:italic;background:#fff;border:2px dashed var(--ink);border-radius:10px;padding:10px">"Lost the key while visiting my granny at Chill Zombie Manor. She's in the top-right room. Good luck getting it back from HER. — Management"</p>`;
+      return;
+    }
+    const weights = { common: 60, rare: 30, legendary: 10 };
+    const filler = ['🍒', '🔔', '🍋', '⭐', '💎', '7️⃣'];
+    el.innerHTML = `<p class="hint">Each spin costs <b>1 🪙 coin</b>. Win coins by winning races at Hoofbeat Stables. Line up 3 of a kind to win a new character skin!</p>
+      <div class="stats"><span id="scoins">🪙 ${save.coins} coins</span><span id="sowned"></span></div>
+      <div class="slot"><div class="reels"><div class="reel" id="r0">🍀</div><div class="reel" id="r1">🎰</div><div class="reel" id="r2">🍀</div></div>
+        <button class="btn big" id="spin">SPIN (1 🪙)</button></div>
+      <p class="msg" id="smsg"></p>
+      <h3 style="margin:12px 0 6px">👕 Wardrobe: click a skin to wear it</h3>
+      <div class="wardrobe" id="ward"></div>`;
+    const reels = [0, 1, 2].map(i => $('#r' + i, el));
+    let spinning = false, timers = [];
+    function renderWard() {
+      $('#ward', el).innerHTML = SKINS.map(s => {
+        const own = save.skins.includes(s.e);
+        return `<button class="skin ${s.r}${own ? '' : ' unowned'}${save.skin === s.e ? ' on' : ''}" data-e="${s.e}" ${own ? '' : 'disabled'} title="${own ? s.n : '???'}">
+          <span>${own ? s.e : '❓'}</span><small>${own ? s.n : s.r}</small></button>`;
+      }).join('');
+      $('#scoins', el).textContent = `🪙 ${save.coins} coins`;
+      $('#sowned', el).textContent = `Skins: ${save.skins.length}/${SKINS.length}`;
+      $('#spin', el).disabled = spinning || save.coins < 1;
+    }
+    $('#ward', el).addEventListener('click', e => {
+      const b = e.target.closest('.skin'); if (!b || b.disabled) return;
+      save.skin = b.dataset.e; persist(); renderWard();
+    });
+    function rollSkin() {
+      const pool = SKINS.filter(s => s.r !== 'starter');
+      let tot = pool.reduce((t, s) => t + weights[s.r], 0), x = Math.random() * tot;
+      for (const s of pool) { x -= weights[s.r]; if (x <= 0) return s; }
+      return pool[0];
+    }
+    $('#spin', el).addEventListener('click', () => {
+      if (spinning || save.coins < 1) return;
+      save.coins--; persist(); spinning = true; renderWard();
+      $('#smsg', el).textContent = '🎶 Spinning…';
+      const roll = Math.random();
+      let final, outcome, prize = null;
+      if (roll < .5) { prize = rollSkin(); final = [prize.e, prize.e, prize.e]; outcome = 'skin'; }
+      else if (roll < .7) { const f = pick(filler); final = shuffle([f, f, pick(filler.filter(x => x !== f))]); outcome = 'refund'; }
+      else { final = shuffle(filler).slice(0, 3); outcome = 'lose'; }
+      const symbols = [...filler, ...SKINS.slice(1).map(s => s.e)];
+      reels.forEach((r, i) => {
+        r.classList.add('spinning');
+        const iv = setInterval(() => r.textContent = pick(symbols), 70);
+        timers.push(iv);
+        timers.push(setTimeout(() => {
+          clearInterval(iv); r.classList.remove('spinning'); r.textContent = final[i];
+          if (i === 2) finish();
+        }, 900 + i * 450));
+      });
+      function finish() {
+        spinning = false;
+        if (outcome === 'skin') {
+          if (save.skins.includes(prize.e)) { save.coins++; $('#smsg', el).textContent = `${prize.e} ${prize.n} again? You already have it, so here's your coin back.`; }
+          else {
+            save.skins.push(prize.e);
+            $('#smsg', el).innerHTML = `🎉 JACKPOT! You won the <b>${prize.r.toUpperCase()}</b> skin: ${prize.e} <b>${prize.n}</b>! Equip it in the wardrobe.`;
+            const rect = $('.slot', el).getBoundingClientRect();
+            for (let k = 0; k < 4; k++) setTimeout(() => launch(rect.left + rand(0, rect.width), rect.top + rand(-40, 40)), k * 180);
+          }
+        } else if (outcome === 'refund') { save.coins++; $('#smsg', el).textContent = 'Two of a kind! You get your coin back. 🪙'; }
+        else $('#smsg', el).textContent = pick(['No luck. The house always wins. 🍀', 'So close! (Not really.)', 'Nothing! Go win more races.']);
+        persist(); renderWard();
+      }
+    });
+    renderWard();
+    return () => timers.forEach(t => { clearInterval(t); clearTimeout(t); });
   }},
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
@@ -1218,7 +1342,7 @@ const games = {
         }
       }
       ctx.save(); ctx.translate(sx(S.x), sy(S.y)); ctx.rotate(ang);
-      ctx.font = '30px serif'; ctx.textBaseline = 'middle'; ctx.fillText('🧒', 0, -4); ctx.restore();
+      ctx.font = '30px serif'; ctx.textBaseline = 'middle'; ctx.fillText(save.skin, 0, -4); ctx.restore();
       ctx.textBaseline = 'alphabetic';
     }
     function loop(t) {
@@ -1273,11 +1397,11 @@ function building(b) {
       ${b.windows === false ? '' : `<span class="win l"${b.win ? ` style="background:${b.win};box-shadow:0 0 14px ${b.win}"` : ''}></span><span class="win r"${b.win ? ` style="background:${b.win};box-shadow:0 0 14px ${b.win}"` : ''}></span>`}
       <span class="big" style="font-size:${b.size || 46}px">${b.emoji}</span>
     </div>
-    <span class="play-tag">🎮 ${b.tag}</span>
+    <span class="play-tag">${b.tag.startsWith('🔒') ? '' : '🎮 '}${b.tag}</span>
   </div>`;
 }
 const places = [
-  { key: 'stable', x: 40, y: 228, w: 170, h: 160, roofH: 55, roof: '#8a2f27', wall: '#c94a3f', emoji: '🐴', name: 'Hoofbeat Stables', tag: 'Pony Derby' },
+  { key: 'stable', x: 58, y: 256, w: 140, h: 132, roofH: 44, size: 36, roof: '#8a2f27', wall: '#c94a3f', emoji: '🐴', name: 'Hoofbeat Stables', tag: 'Pony Derby' },
   { key: 'crayon', x: 670, y: 232, w: 260, h: 156, roofH: 46, style: 'pediment', roof: '#e9e1f5',
     wall: 'repeating-linear-gradient(90deg, #f6f0ff 0 22px, #ddd0f2 22px 30px)', emoji: '🖍️', name: 'Museum of Crayons', tag: 'Draw a Masterpiece' },
   { key: 'hats', x: 985, y: 245, w: 175, h: 143, roofH: 30, style: 'flat', roof: '#22223a', wall: '#ffd1dc', emoji: '🎩', name: 'Hats Hats Hats', tag: 'Hat Rush' },
@@ -1286,10 +1410,12 @@ const places = [
   { key: 'nails', x: 985, y: 520, w: 180, h: 144, roofH: 36, style: 'awning', stripes: true, roof: '#ff7fae', wall: '#ffe3f1', emoji: '💅', name: 'Glitter Claws Nails', tag: 'Polish Panic' },
   { key: 'checkers', x: 678, y: 762, w: 150, h: 108, roofH: 38, roof: '#22223a', wall: 'repeating-conic-gradient(#fff 0 25%, #f3c4c4 0 50%) 0 0/24px 24px', emoji: '🔴⚫', size: 26, name: 'Checkers Club', tag: 'Checkers Match' },
   { key: 'zombies', x: 70, y: 62, w: 190, h: 143, roofH: 50, roof: '#3b2a4d', wall: '#7d8a76', win: '#a6ff8f', emoji: '🧟', size: 40, name: 'Chill Zombie Manor', tag: 'Explore' },
+  { key: 'casino', x: 1010, y: 760, w: 172, h: 112, roofH: 36, style: 'flat', roof: 'linear-gradient(90deg,#2f9e44,#ffd84a,#2f9e44)', wall: '#1f4d2e', win: '#9dff8a', emoji: '🍀🎰', size: 34, name: 'Lucky Clover Casino', tag: '🔒 Locked' },
   { key: 'penny', x: 300, y: 762, w: 190, h: 108, roofH: 38, roof: '#b8692e', wall: '#f6d9b8', emoji: '🪙', size: 34, name: 'The Penny House', tag: 'Penny Press' },
   { key: 'socks', x: 60, y: 762, w: 200, h: 108, roofH: 38, roof: '#3aa0f0', wall: '#e6f4ff', emoji: '🧦', size: 34, name: 'Lost Sock Office', tag: 'Match the Pairs' },
 ];
 places.forEach(b => add(building(b)));
+setTimeout(updateHud);
 
 // the mountain on the horizon
 add(`<div class="mountain" data-key="mountain" style="left:880px;top:30px;width:250px;height:175px">
@@ -1320,9 +1446,9 @@ add(`<div class="pond duckpond" data-key="ducks" style="left:526px;top:770px;wid
   <div class="orbit" style="animation-duration:15s"><span style="left:-38px;top:12px;font-size:26px">🪿</span></div>
   <span class="play-tag" style="bottom:-14px">🎮 Feed the Ducks</span>
 </div>`);
-add(`<div class="welcome" style="left:845px;top:770px">Welcome to 🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:13px">Population: 47 people &amp; 112 ducks</span></div>`);
-add(`<div class="tree" style="left:885px;top:850px;font-size:28px;letter-spacing:4px">🌷🌷🌼🌷🌷🌼🌷🌷</div>`);
-[[490, 770], [845, 870], [290, 200], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
+add(`<div class="welcome" style="left:842px;top:766px;width:150px;font-size:13px;padding:6px 8px">Welcome to<br>🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:11px">Pop. 47 people &amp; 112 ducks</span></div>`);
+add(`<div class="tree" style="left:842px;top:862px;font-size:20px;letter-spacing:2px">🌷🌼🌷🌼🌷🌼</div>`);
+[[490, 770], [290, 200], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
   .forEach(([x, y]) => add(`<span class="tree" style="left:${x}px;top:${y}px">${pick(['🌳', '🌲', '🌳'])}</span>`));
 
 // traffic
