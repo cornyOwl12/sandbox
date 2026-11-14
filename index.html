@@ -5,71 +5,94 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Tulip PIE 🌷🥧</title>
 <style>
-  :root {
-    --ink: #2b1d3a;
-    --cream: #fff8ec;
-  }
+  :root { --ink: #2b1d3a; --cream: #fff8ec; }
   * { box-sizing: border-box; }
-  html { background: #5fae55; }
-  html, body { margin: 0; min-height: 100%; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
   body {
     font-family: "Trebuchet MS", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    color: var(--ink);
-    background: linear-gradient(#1b1747 0%, #4a2c6e 28%, #c45a7a 48%, #f6a65b 58%, #7cc46a 58.2%, #5fae55 100%);
-    background-attachment: fixed;
-    overflow-x: hidden;
-    user-select: none;
+    color: var(--ink); user-select: none; background: #6dbb5c;
   }
   #fx { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+  #scene { position: absolute; left: 0; top: 0; width: 1200px; height: 900px; transform-origin: 0 0; cursor: crosshair; }
 
-  header { text-align: center; padding: 28px 12px 10px; color: #fff; cursor: crosshair; }
-  header h1 {
-    margin: 0; font-size: clamp(2.6rem, 8vw, 5.5rem); letter-spacing: .03em;
-    text-shadow: 0 4px 0 #8a3b6b, 0 0 30px rgba(255,200,230,.5);
+  /* sky & ground */
+  .sky { position: absolute; left: 0; top: 0; width: 1200px; height: 200px;
+    background: linear-gradient(#1b1747, #4a2c6e 40%, #c45a7a 72%, #f6a65b); }
+  .star { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #fff; animation: twinkle 2.5s ease-in-out infinite; }
+  @keyframes twinkle { 50% { opacity: .2; } }
+  .moon { position: absolute; left: 1080px; top: 22px; font-size: 44px; }
+  .hills { position: absolute; left: 0; top: 130px; width: 1200px; height: 80px; }
+  .title {
+    position: absolute; left: 0; width: 1200px; top: 18px; text-align: center; color: #fff; pointer-events: none;
+    font-size: 64px; font-weight: bold; letter-spacing: .03em; text-shadow: 0 4px 0 #8a3b6b, 0 0 30px rgba(255,200,230,.5);
   }
-  header p { margin: 6px 0 0; opacity: .85; font-size: clamp(.95rem, 2vw, 1.15rem); }
-  .sky-gap { height: 18vh; cursor: crosshair; }
+  .subtitle { position: absolute; left: 0; width: 1200px; top: 100px; text-align: center; color: #fff; opacity: .85; font-size: 18px; pointer-events: none; }
+  .ground { position: absolute; left: 0; top: 190px; width: 1200px; height: 710px;
+    background: radial-gradient(circle at 20% 30%, #78c766 0 2px, transparent 3px) 0 0/38px 38px, #6dbb5c; }
 
-  .street-wrap { position: relative; padding: 0 16px 40px; }
-  .town {
-    display: grid; gap: 22px; max-width: 1100px; margin: 0 auto;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    position: relative; z-index: 2;
-  }
-  .building {
-    position: relative; cursor: pointer; border: none; padding: 0; background: none;
-    font: inherit; color: inherit; text-align: center;
-    transition: transform .15s;
-  }
-  .building:hover, .building:focus-visible { transform: translateY(-6px) rotate(-1deg); outline: none; }
-  .roof {
-    height: 54px; margin: 0 10px;
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  }
-  .walls {
-    border-radius: 0 0 10px 10px; padding: 14px 10px 12px;
-    box-shadow: 0 8px 0 rgba(0,0,0,.18);
-    border: 3px solid rgba(0,0,0,.15); border-top: none;
-  }
-  .walls .emoji { font-size: 58px; line-height: 1; display: block; filter: drop-shadow(0 3px 0 rgba(0,0,0,.15)); }
-  .sign {
-    display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 6px;
-    background: var(--cream); font-weight: bold; font-size: .95rem; border: 2px solid var(--ink);
-  }
-  .tagline { display: block; font-size: .78rem; margin-top: 6px; opacity: .8; }
+  /* roads */
+  .road { position: absolute; background: #4a4655; }
+  .road.h { border-top: 7px solid #d8cfc0; border-bottom: 7px solid #d8cfc0; }
+  .road.v { border-left: 7px solid #d8cfc0; border-right: 7px solid #d8cfc0; }
+  .road.h::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 2px); height: 4px;
+    background: repeating-linear-gradient(90deg, #ffd84a 0 26px, transparent 26px 52px); }
+  .road.v::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% - 2px); width: 4px;
+    background: repeating-linear-gradient(180deg, #ffd84a 0 26px, transparent 26px 52px); }
+  .crossing { position: absolute; background: #4a4655; z-index: 1; }
+  .street-sign { position: absolute; background: #2e7d4f; color: #fff; font-size: 12px; font-weight: bold; padding: 2px 7px; border-radius: 4px; border: 2px solid #fff; z-index: 6; pointer-events: none; }
 
-  .road {
-    max-width: 1100px; margin: 34px auto 0; height: 70px; background: #44404f; border-radius: 12px;
-    position: relative; overflow: hidden; box-shadow: inset 0 -6px 0 rgba(0,0,0,.25);
+  /* moving things */
+  .mover { position: absolute; font-size: 34px; z-index: 5; pointer-events: none; line-height: 1; }
+  .flip { display: inline-block; transform: scaleX(-1); }
+  @keyframes eastbound { from { left: -70px; } to { left: 1230px; } }
+  @keyframes westbound { from { left: 1230px; } to { left: -70px; } }
+  @keyframes southbound { from { top: 140px; } to { top: 930px; } }
+  @keyframes northbound { from { top: 930px; } to { top: 140px; } }
+  @keyframes pace { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(var(--d)); } }
+  @keyframes paceflip { 0%, 49% { transform: scaleX(-1); } 50%, 100% { transform: scaleX(1); } }
+
+  /* buildings */
+  .bldg { position: absolute; cursor: pointer; z-index: 3; transition: transform .15s, filter .15s; }
+  .bldg:hover { transform: translateY(-5px); filter: brightness(1.08) drop-shadow(0 6px 0 rgba(0,0,0,.15)); }
+  .roof { position: relative; }
+  .roof.peak { clip-path: polygon(50% 0, 100% 100%, 0 100%); margin: 0 -10px; }
+  .roof.pediment { clip-path: polygon(50% 0, 100% 100%, 0 100%); margin: 0 -14px; }
+  .roof.flat { border-radius: 6px 6px 0 0; margin: 0 -6px; }
+  .roof.awning { margin: 0 -10px; border-radius: 0 0 14px 14px; box-shadow: 0 4px 0 rgba(0,0,0,.15); }
+  .walls { position: relative; border: 3px solid rgba(0,0,0,.2); border-top: none; border-radius: 0 0 6px 6px; box-shadow: 0 7px 0 rgba(0,0,0,.18); }
+  .walls .sign { position: absolute; top: 7px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    background: var(--cream); border: 2px solid var(--ink); border-radius: 6px; padding: 2px 8px; font-weight: bold; font-size: 14px; z-index: 2; }
+  .walls .big { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); font-size: 46px; line-height: 1; z-index: 2; }
+  .door { position: absolute; bottom: 0; left: 50%; width: 30px; height: 44px; transform: translateX(-50%); background: #6b3f1f; border-radius: 15px 15px 0 0; border: 2px solid rgba(0,0,0,.25); opacity: 0; }
+  .win { position: absolute; width: 30px; height: 30px; background: #ffe58a; border: 3px solid rgba(0,0,0,.25); border-radius: 4px; box-shadow: 0 0 14px #ffd84a; top: 42px; }
+  .win.l { left: 14px; } .win.r { right: 14px; }
+  .tower { position: absolute; left: 50%; transform: translateX(-50%); width: 44px; background: #c94a3f; border: 3px solid rgba(0,0,0,.2); text-align: center; font-size: 22px; }
+  .tower::before { content: ""; position: absolute; left: -8px; right: -8px; top: -30px; height: 30px; background: #8a2f27; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .play-tag { position: absolute; left: 50%; bottom: -26px; transform: translateX(-50%); white-space: nowrap; background: #ffe27a; border: 2px solid var(--ink); border-radius: 999px; font-size: 12px; font-weight: bold; padding: 1px 9px; z-index: 4; }
+
+  /* special places */
+  .paddock { position: absolute; z-index: 2; cursor: pointer; border-radius: 10px;
+    background: #9ccf6a; border: 6px solid #a0703f; outline: 3px dashed #7a5230; outline-offset: -12px; }
+  .pond { position: absolute; z-index: 3; cursor: pointer; border-radius: 50%;
+    background: radial-gradient(ellipse at 40% 35%, #ffffff 0 10%, #d9f3ff 30%, #a8dcf5 75%); border: 10px solid #f4fbff; box-shadow: 0 0 0 4px #bfe3f2, 0 8px 0 rgba(0,0,0,.12); transition: filter .15s; }
+  .pond:hover, .paddock:hover { filter: brightness(1.07); }
+  .pond .sign, .paddock .sign { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; background: var(--cream); border: 2px solid var(--ink); border-radius: 6px; padding: 2px 8px; font-weight: bold; font-size: 14px; z-index: 2; }
+  .orbit { position: absolute; left: 50%; top: 50%; width: 0; height: 0; animation: spin linear infinite; }
+  .orbit span { position: absolute; font-size: 30px; transform: translate(-50%, -50%); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .fountain { position: absolute; z-index: 3; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, #8fd3ff 0 45%, #c9c1b3 46% 60%, #e7dfd2 61%); display: flex; align-items: center; justify-content: center; font-size: 56px; pointer-events: none; }
+  .tree { position: absolute; font-size: 40px; z-index: 2; pointer-events: none; line-height: 1; }
+  .welcome { position: absolute; z-index: 3; background: #fff8ec; border: 3px solid #6b3f1f; border-radius: 10px; padding: 8px 12px; text-align: center; font-weight: bold; font-size: 15px; box-shadow: 0 5px 0 rgba(0,0,0,.2); pointer-events: none; }
+  .welcome::after { content: ""; position: absolute; left: 50%; bottom: -34px; width: 8px; height: 31px; background: #6b3f1f; transform: translateX(-50%); }
+
+  /* player */
+  #player { position: absolute; z-index: 8; font-size: 36px; line-height: 1; transform: translate(-50%, -80%); pointer-events: none; filter: drop-shadow(0 4px 0 rgba(0,0,0,.25)); }
+  #player.left { transform: translate(-50%, -80%) scaleX(-1); }
+  #help {
+    position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 40; background: rgba(255,248,236,.92);
+    border: 2px solid var(--ink); border-radius: 999px; padding: 6px 16px; font-size: 14px; white-space: nowrap; pointer-events: none;
   }
-  .road::before {
-    content: ""; position: absolute; left: 0; right: 0; top: 33px; height: 4px;
-    background: repeating-linear-gradient(90deg, #ffd84a 0 30px, transparent 30px 60px);
-  }
-  .car { position: absolute; top: 12px; font-size: 38px; animation: drive 9s linear infinite; }
-  .car.b { top: 22px; animation-duration: 13s; animation-delay: -5s; }
-  @keyframes drive { from { left: -60px; } to { left: 100%; } }
-  .flowers { text-align: center; font-size: 26px; letter-spacing: 10px; margin-top: 14px; }
+  @media (max-width: 700px) { #help { font-size: 11px; white-space: normal; text-align: center; width: 92%; border-radius: 14px; } }
 
   /* modal */
   #modal {
@@ -146,18 +169,20 @@
 </head>
 <body>
 <canvas id="fx"></canvas>
-
-<header id="sky">
-  <h1>🌷 Tulip PIE 🥧</h1>
-  <p>Click a building to play a game • Click the sky for fireworks</p>
-</header>
-<div class="sky-gap" id="skygap"></div>
-
-<div class="street-wrap">
-  <div class="town" id="town"></div>
-  <div class="road"><span class="car">🚗</span><span class="car b">🚌</span></div>
-  <div class="flowers">🌷🌳🌷🌼🌷🌳🌷🌼🌷🌳🌷</div>
+<div id="scene">
+  <div class="sky" id="sky"></div>
+  <span class="moon">🌙</span>
+  <svg class="hills" viewBox="0 0 1200 80" preserveAspectRatio="none">
+    <path d="M0 60 Q150 0 300 45 T600 40 T900 30 T1200 50 V80 H0Z" fill="#4f8f4a"/>
+    <path d="M0 70 Q200 30 400 62 T800 55 T1200 62 V80 H0Z" fill="#5fa653"/>
+  </svg>
+  <div class="title">🌷 Tulip PIE 🥧</div>
+  <div class="subtitle">A very real town where nothing is normal</div>
+  <div class="ground"></div>
+  <div id="town"></div>
+  <div id="player">🧒</div>
 </div>
+<div id="help">🧒 Arrow keys / WASD to walk • Bump into or click a building to play • Click the sky or grass for fireworks</div>
 
 <div id="modal" class="hidden" role="dialog" aria-modal="true">
   <div class="panel">
@@ -186,7 +211,6 @@ function resizeFx() {
   FW = innerWidth; FH = innerHeight;
   fx.width = FW * d; fx.height = FH * d; fctx.setTransform(d, 0, 0, d, 0, 0);
 }
-addEventListener('resize', resizeFx); resizeFx();
 const rockets = [], sparks = [];
 function launch(x, y) {
   const sx = x + rand(-40, 40), sy = FH;
@@ -222,11 +246,6 @@ function burst(x, y, hue) {
   fctx.globalCompositeOperation = 'source-over';
   requestAnimationFrame(fxLoop);
 })();
-document.addEventListener('pointerdown', e => {
-  if (!$('#modal').classList.contains('hidden')) return;
-  if (e.target.closest('.building, .road, #modal')) return;
-  launch(e.clientX, e.clientY);
-});
 
 /* ---------------- games ---------------- */
 const galleryImgs = [];
@@ -555,28 +574,109 @@ const games = {
   }},
 };
 
-/* ---------------- town ---------------- */
-const buildings = [
-  { key: 'stable',   emoji: '🐴', name: 'Hoofbeat Stables',     tag: 'Pony Derby',         roof: '#8a4f28', wall: '#e2b07a' },
-  { key: 'rink',     emoji: '⛸️', name: 'Frosty Loop Rink',     tag: 'Snowflake Catch',    roof: '#3aa0f0', wall: '#d6f0ff' },
-  { key: 'lemonade', emoji: '🍋', name: "Lulu's Lemonade",      tag: 'Lemonade Rush',      roof: '#ff9f43', wall: '#fff3a0' },
-  { key: 'crayon',   emoji: '🖍️', name: 'Museum of Crayons',    tag: 'Draw a Masterpiece', roof: '#7d4bc2', wall: '#f1e4ff' },
-  { key: 'hats',     emoji: '🎩', name: 'Hats Hats Hats',       tag: 'Hat Rush',           roof: '#22223a', wall: '#ffd1dc' },
-  { key: 'couch',    emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker',    roof: '#3fb54a', wall: '#e5f7d9' },
-  { key: 'socks',    emoji: '🧦', name: 'Lost Sock Office',     tag: 'Match the Pairs',    roof: '#e8364f', wall: '#fde6e9' },
-  { key: 'bakery',   emoji: '🥧', name: 'Tulip PIE Bakery',     tag: 'Pie Tycoon',         roof: '#d9a35b', wall: '#fff0d6' },
-];
-$('#town').innerHTML = buildings.map(b => `
-  <button class="building" data-key="${b.key}">
-    <div class="roof" style="background:${b.roof}"></div>
-    <div class="walls" style="background:${b.wall}">
-      <span class="emoji">${b.emoji}</span>
-      <span class="sign">${b.name}</span>
-      <span class="tagline">🎮 ${b.tag}</span>
-    </div>
-  </button>`).join('');
+/* ---------------- town layout (scene is 1200 x 900) ---------------- */
+const town = $('#town');
+const add = html => town.insertAdjacentHTML('beforeend', html);
 
-let cleanup = null;
+// stars
+for (let i = 0; i < 40; i++) add(`<span class="star" style="left:${rand(0, 1200)}px;top:${rand(4, 120)}px;animation-delay:${rand(0, 2.5)}s"></span>`);
+
+// roads: Crayon Blvd (vertical) first, then the avenues on top
+add(`<div class="road v" style="left:566px;top:190px;width:64px;height:564px"></div>`);
+add(`<div class="road h" style="left:0;top:410px;width:1200px;height:64px"></div>`);
+add(`<div class="road h" style="left:0;top:690px;width:1200px;height:64px"></div>`);
+add(`<div class="street-sign" style="left:470px;top:388px">Tulip Ave</div>`);
+add(`<div class="street-sign" style="left:250px;top:668px">Pie Lane</div>`);
+add(`<div class="street-sign" style="left:636px;top:296px">Crayon Blvd</div>`);
+
+// buildings
+function building(b) {
+  const roofH = b.roofH || 50, wallH = b.h - roofH;
+  const roofBg = b.stripes ? `repeating-linear-gradient(90deg, ${b.roof} 0 18px, #fff 18px 36px)` : b.roof;
+  return `<div class="bldg" data-key="${b.key}" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px">
+    ${b.tower ? `<div class="tower" style="top:${-28}px;height:${roofH}px">🔔</div>` : ''}
+    <div class="roof ${b.style || 'peak'}" style="height:${roofH}px;background:${roofBg}"></div>
+    <div class="walls" style="height:${wallH}px;background:${b.wall}">
+      <span class="sign">${b.name}</span>
+      ${b.windows === false ? '' : '<span class="win l"></span><span class="win r"></span>'}
+      <span class="big" style="font-size:${b.size || 46}px">${b.emoji}</span>
+    </div>
+    <span class="play-tag">🎮 ${b.tag}</span>
+  </div>`;
+}
+const places = [
+  { key: 'stable', x: 40, y: 228, w: 170, h: 160, roofH: 55, roof: '#8a2f27', wall: '#c94a3f', emoji: '🐴', name: 'Hoofbeat Stables', tag: 'Pony Derby' },
+  { key: 'crayon', x: 670, y: 232, w: 260, h: 156, roofH: 46, style: 'pediment', roof: '#e9e1f5',
+    wall: 'repeating-linear-gradient(90deg, #f6f0ff 0 22px, #ddd0f2 22px 30px)', emoji: '🖍️', name: 'Museum of Crayons', tag: 'Draw a Masterpiece' },
+  { key: 'hats', x: 985, y: 245, w: 175, h: 143, roofH: 30, style: 'flat', roof: '#22223a', wall: '#ffd1dc', emoji: '🎩', name: 'Hats Hats Hats', tag: 'Hat Rush' },
+  { key: 'lemonade', x: 410, y: 548, w: 132, h: 112, roofH: 32, style: 'awning', stripes: true, roof: '#ffcc1f', wall: '#c98d4f', windows: false, emoji: '🍋', size: 40, name: "Lulu's Lemonade", tag: 'Lemonade Rush' },
+  { key: 'couch', x: 665, y: 514, w: 270, h: 150, roofH: 48, tower: true, roof: '#2f7d3a', wall: '#f3e2c4', emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker' },
+  { key: 'bakery', x: 985, y: 520, w: 180, h: 144, roofH: 36, style: 'awning', stripes: true, roof: '#ff7fae', wall: '#fff0d6', emoji: '🥧', name: 'Tulip PIE Bakery', tag: 'Pie Tycoon' },
+  { key: 'socks', x: 60, y: 762, w: 200, h: 108, roofH: 38, roof: '#3aa0f0', wall: '#e6f4ff', emoji: '🧦', size: 34, name: 'Lost Sock Office', tag: 'Match the Pairs' },
+];
+places.forEach(b => add(building(b)));
+
+// horse paddock (part of the stables)
+add(`<div class="paddock" data-key="stable" style="left:236px;top:236px;width:305px;height:150px">
+  <span class="sign" style="top:-16px">🐎 Paddock</span>
+  <span class="mover" style="left:30px;top:40px;--d:180px;animation:pace 7s ease-in-out infinite"><span style="display:inline-block;animation:paceflip 7s steps(1) infinite">🐎</span></span>
+  <span class="mover" style="left:60px;top:90px;--d:140px;animation:pace 9s ease-in-out infinite -3s"><span style="display:inline-block;animation:paceflip 9s steps(1) infinite -3s">🐴</span></span>
+  <span class="mover" style="left:240px;top:20px;font-size:26px">🌾</span>
+</div>`);
+
+// frozen pond rink with skaters going round
+add(`<div class="pond" data-key="rink" style="left:40px;top:492px;width:330px;height:180px">
+  <span class="sign" style="top:-18px">⛸️ Frosty Loop Rink</span>
+  <div class="orbit" style="animation-duration:7s"><span style="left:0;top:-55px">⛸️</span></div>
+  <div class="orbit" style="animation-duration:11s;animation-direction:reverse"><span style="left:70px;top:0">🧊</span></div>
+  <div class="orbit" style="animation-duration:9s"><span style="left:-62px;top:12px">🐧</span></div>
+</div>`);
+
+// town square, sign, garden, trees
+add(`<div class="fountain" style="left:533px;top:768px;width:130px;height:130px">⛲</div>`);
+add(`<div class="welcome" style="left:845px;top:770px">Welcome to 🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:13px">Population: 47 people &amp; 112 ducks</span></div>`);
+add(`<div class="tree" style="left:885px;top:850px;font-size:28px;letter-spacing:4px">🌷🌷🌼🌷🌷🌼🌷🌷</div>`);
+[[300, 790], [380, 840], [700, 800], [760, 855], [205, 200], [935, 200], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
+  .forEach(([x, y]) => add(`<span class="tree" style="left:${x}px;top:${y}px">${pick(['🌳', '🌲', '🌳'])}</span>`));
+add(`<span class="mover" style="left:420px;top:870px;font-size:24px;--d:70px;animation:pace 5s ease-in-out infinite">🦆</span>`);
+add(`<span class="mover" style="left:460px;top:880px;font-size:20px;--d:50px;animation:pace 4s ease-in-out infinite -1s">🦆</span>`);
+
+// traffic
+const cars = [
+  ['🚗', 'eastbound', 9, 0, 'top:440px', true], ['🚌', 'eastbound', 14, -6, 'top:438px', true],
+  ['🚙', 'westbound', 11, -2, 'top:412px'], ['🚚', 'westbound', 16, -9, 'top:410px'],
+  ['🚕', 'eastbound', 10, -4, 'top:720px', true], ['🛻', 'westbound', 12, -1, 'top:692px'],
+  ['🚲', 'westbound', 20, -12, 'top:695px'],
+];
+cars.forEach(([e, anim, dur, delay, pos, flip]) =>
+  add(`<span class="mover" style="${pos};font-size:30px;animation:${anim} ${dur}s linear infinite ${delay}s">${flip ? `<span class="flip">${e}</span>` : e}</span>`));
+add(`<style>
+  @keyframes southbound { 0% { top: 170px; opacity: 0; } 6% { opacity: 1; } 94% { opacity: 1; } 100% { top: 730px; opacity: 0; } }
+  @keyframes northbound { 0% { top: 730px; opacity: 0; } 6% { opacity: 1; } 94% { opacity: 1; } 100% { top: 170px; opacity: 0; } }
+</style>`);
+add(`<span class="mover" style="left:574px;font-size:28px;animation:southbound 8s linear infinite">🚓</span>`);
+add(`<span class="mover" style="left:598px;font-size:28px;animation:northbound 10s linear infinite -4s">🚐</span>`);
+// pedestrians on the sidewalks
+add(`<span class="mover" style="top:384px;font-size:24px;animation:eastbound 38s linear infinite -10s"><span class="flip">🚶</span></span>`);
+add(`<span class="mover" style="top:384px;font-size:22px;animation:eastbound 38s linear infinite -11s"><span class="flip">🐕</span></span>`);
+add(`<span class="mover" style="top:756px;font-size:24px;animation:westbound 45s linear infinite -20s">🚶‍♀️</span>`);
+
+/* ---------------- fit the town to the window ---------------- */
+const scene = $('#scene');
+let S = 1, OX = 0, OY = 0;
+function fit() {
+  const usableH = innerHeight - 46;
+  S = Math.min(innerWidth / 1200, usableH / 900);
+  OX = (innerWidth - 1200 * S) / 2; OY = Math.max(0, (usableH - 900 * S) / 2);
+  scene.style.transform = `translate(${OX}px, ${OY}px) scale(${S})`;
+  const skyEnd = OY + 200 * S;
+  document.body.style.background = `linear-gradient(#1b1747 0, #4a2c6e ${skyEnd * .4}px, #c45a7a ${skyEnd * .72}px, #f6a65b ${skyEnd}px, #6dbb5c ${skyEnd}px)`;
+  resizeFx();
+}
+addEventListener('resize', fit); fit();
+
+/* ---------------- modal ---------------- */
+let cleanup = null, lastPlace = null;
 function openGame(key) {
   closeGame();
   const g = games[key];
@@ -588,12 +688,65 @@ function closeGame() {
   if (cleanup) cleanup();
   cleanup = null;
   $('#game').innerHTML = '';
-  $('#modal').classList.add('hidden');
+  if (!$('#modal').classList.contains('hidden')) {
+    $('#modal').classList.add('hidden');
+    // step the player back out the front door
+    if (lastPlace) { player.y = Math.min(890, lastPlace.y + lastPlace.h + 34); player.x = lastPlace.x + lastPlace.w / 2; lastPlace = null; }
+  }
 }
-$('#town').addEventListener('click', e => { const b = e.target.closest('.building'); if (b) openGame(b.dataset.key); });
 $('#close').addEventListener('click', closeGame);
 $('#modal').addEventListener('pointerdown', e => { if (e.target.id === 'modal') closeGame(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGame(); });
+
+town.addEventListener('click', e => {
+  const b = e.target.closest('[data-key]');
+  if (!b) return;
+  lastPlace = rectOf(b);
+  openGame(b.dataset.key);
+});
+document.addEventListener('pointerdown', e => {
+  if (!$('#modal').classList.contains('hidden')) return;
+  if (e.target.closest('[data-key], #modal')) return;
+  launch(e.clientX, e.clientY);
+});
+
+/* ---------------- walking kid ---------------- */
+const playerEl = $('#player');
+const player = { x: 450, y: 860 };
+const keys = {};
+const rectOf = el => ({ x: parseFloat(el.style.left), y: parseFloat(el.style.top), w: parseFloat(el.style.width), h: parseFloat(el.style.height), key: el.dataset.key });
+const solids = () => [...town.querySelectorAll('[data-key]')].map(rectOf);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeGame(); return; }
+  if (!$('#modal').classList.contains('hidden')) return;
+  const k = e.key.toLowerCase();
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) { keys[k] = true; e.preventDefault(); }
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));
+let lastT = performance.now();
+(function walk(t) {
+  const dt = Math.min((t - lastT) / 1000, .05); lastT = t;
+  if ($('#modal').classList.contains('hidden')) {
+    let dx = 0, dy = 0;
+    if (keys.arrowleft || keys.a) dx -= 1;
+    if (keys.arrowright || keys.d) dx += 1;
+    if (keys.arrowup || keys.w) dy -= 1;
+    if (keys.arrowdown || keys.s) dy += 1;
+    if (dx || dy) {
+      const len = Math.hypot(dx, dy), sp = 260;
+      player.x = Math.max(15, Math.min(1185, player.x + dx / len * sp * dt));
+      player.y = Math.max(215, Math.min(895, player.y + dy / len * sp * dt));
+      if (dx) playerEl.classList.toggle('left', dx < 0);
+      const hit = solids().find(r => player.x > r.x + 6 && player.x < r.x + r.w - 6 && player.y > r.y + 10 && player.y < r.y + r.h + 4);
+      if (hit) { Object.keys(keys).forEach(k => keys[k] = false); lastPlace = hit; openGame(hit.key); }
+    }
+  } else {
+    Object.keys(keys).forEach(k => keys[k] = false);
+  }
+  playerEl.style.left = player.x + 'px';
+  playerEl.style.top = player.y + 'px';
+  requestAnimationFrame(walk);
+})(performance.now());
 </script>
 </body>
 </html>

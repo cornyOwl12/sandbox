@@ -1,6 +1,6 @@
 # 🌷 Tulip PIE 🥧
 
-A silly little neighborhood website. Click the sky for fireworks, or click a building to play a game:
+A silly little town. Walk around with the arrow keys or WASD, click the sky for fireworks, and bump into (or click) a building to play its game:
 
 | Building | Game |
 |---|---|
