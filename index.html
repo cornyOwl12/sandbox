@@ -261,6 +261,17 @@
   @keyframes pennyfall { to { top: 190px; transform: rotate(360deg); } }
   .panel.shake { animation: shake .5s; }
   @keyframes shake { 20% { transform: translate(-10px, 4px); } 40% { transform: translate(9px, -6px); } 60% { transform: translate(-7px, 5px); } 80% { transform: translate(5px, -3px); } }
+  .keypad { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 210px; background: #3b2a4d; border: 4px solid var(--ink); border-radius: 16px; padding: 12px; color: #fff; text-align: center; z-index: 5; box-shadow: 0 8px 0 rgba(0,0,0,.3); }
+  .keypad.hidden { display: none; }
+  .keypad.shake { animation: kpshake .4s; }
+  @keyframes kpshake { 25% { transform: translate(calc(-50% - 8px), -50%); } 75% { transform: translate(calc(-50% + 8px), -50%); } }
+  .kp-title { font-weight: bold; margin-bottom: 6px; }
+  .kp-display { font-family: monospace; font-size: 30px; letter-spacing: 4px; background: #1d3b2a; color: #9dff8a; border-radius: 8px; padding: 4px; margin-bottom: 8px; }
+  .kp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .kp-grid button { font: inherit; font-size: 20px; font-weight: bold; padding: 8px 0; border-radius: 10px; border: 2px solid var(--ink); background: #ffe27a; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+  .kp-grid button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  .kp-msg { margin-top: 8px; font-size: 13px; min-height: 1.2em; }
+  .kp-x { position: absolute; top: 6px; right: 6px; background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -1080,7 +1091,12 @@ const games = {
   zombies: { title: '🧟 Chill Zombie Manor: Have a Look Around', start(el) {
     el.innerHTML = `<p class="hint">Walk around with <b>WASD / arrow keys</b> (or tap where to go). Walk up to the zombies to chat. They're super chill. Mostly. 👵 Whatever you do, don't bother Granny Grumbles.</p>
       <div class="stats"><span id="zroom">📍 Front Hall</span><span id="zshoo">Times Granny shooed you: 0</span></div>
-      <canvas class="game" width="800" height="480"></canvas><p class="msg" id="zmsg"></p>`;
+      <div class="secret-wrap"><canvas class="game" width="800" height="480"></canvas>
+        <div class="keypad hidden" id="kp"><button class="kp-x" id="kpx" title="Close">✖</button>
+          <div class="kp-title">🔒 Granny's Door</div><div class="kp-display" id="kpd">_ _ _ _</div>
+          <div class="kp-grid">${[1, 2, 3, 4, 5, 6, 7, 8, 9, '⌫', 0, '✔'].map(k => `<button data-kp="${k}">${k}</button>`).join('')}</div>
+          <div class="kp-msg" id="kpmsg">Enter the 4-digit code</div></div></div>
+      <p class="msg" id="zmsg"></p>`;
     const c = $('canvas', el), ctx = c.getContext('2d');
     const walls = [];
     const hwall = (y, x1, x2, gaps = []) => { let x = x1; for (const [a, b] of [...gaps, [x2, x2]]) { if (a > x) walls.push([x, y - 5, a - x, 10]); x = b; } };
@@ -1112,7 +1128,7 @@ const games = {
       Z('Couch Kevin', '🧟‍♂️', 120, 380, [40, 300, 220, 140], ["This show is so good. I'm dead serious.", "I haven't left this couch in 40 years. Livin' the dream.", 'Wanna watch? It\'s a cooking show. Mostly about brains. KIDDING.']),
       Z('Greeter Greg', '🧟', 400, 330, [300, 260, 200, 180], ['Welcome to Chill Zombie Manor! Shoes on, nobody cares.', "Granny's room is top right. Don't wake her.", 'Want a hug? No? Fair. I\'m a bit squishy.']),
       Z('Chef Moldy', '🧟‍♀️', 700, 320, [560, 270, 200, 170], ['Brain-free pancakes, coming right up!', "Taste this. Too salty? I can't taste anything.", "Don't mind the smell. That's just me."]),
-      Z('Bookworm Bea', '🧟‍♀️', 120, 140, [40, 80, 180, 140], ["Shh... I'm at the good part.", 'This one\'s a romance. A zombie falls for a VAMPIRE?! Scandalous.', 'My library card expired in 1873. Nobody\'s checked.']),
+      Z('Bookworm Bea', '🧟‍♀️', 120, 140, [40, 80, 180, 140], ["Shh... I'm at the good part.", 'This one\'s a romance. A zombie falls for a VAMPIRE?! Scandalous.', 'My library card expired in 1873. Nobody\'s checked.', 'Granny locked her door again. She uses her birthday for EVERYTHING. December 23rd. Don\'t tell her I told you. 🤫']),
       Z('Bubbles', '🧟', 300, 72, [300, 72, 0, 0], ['DO YOU MIND?!', 'Me and Rubber Ducky are having a moment. 🦆', "I'm just soaking. And slightly dissolving."], true),
       Z('DJ Rotten', '🧟‍♂️', 470, 140, [380, 90, 180, 130], ["This next song is called 'Grave Vibes'! 🎸", 'I only know one chord. The deadliest one.', 'Rock and roll never dies. Neither do I!']),
     ];
@@ -1121,15 +1137,51 @@ const games = {
     const grannyChase = ['COME HERE, YOU WHIPPERSNAPPER!', "I'll rattle my cane at you!", 'GET OUT OF MY ROOM!'];
     const player = { x: 400, y: 430 };
     let target = null, shoos = 0, keys = {}, raf, last = performance.now(), say = null, sayT = 0, msgT = 0;
-    const kd = e => { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) { keys[k] = true; target = null; e.preventDefault(); } };
+    // ---- combination lock on Granny's door ----
+    const DOOR = [575, 85, 10, 60], LOCK = { x: 580, y: 115 }, CODE = '1223';
+    let kpOpen = false, entry = '';
+    const kp = $('#kp', el), kpd = $('#kpd', el), kpmsg = $('#kpmsg', el);
+    const nearDoor = () => Math.hypot(player.x - LOCK.x, player.y - LOCK.y) < 60;
+    function showKp(on) { kpOpen = on; kp.classList.toggle('hidden', !on); keys = {}; target = null; if (on) { entry = ''; drawKp(); kpmsg.textContent = 'Enter the 4-digit code'; } }
+    function drawKp() { kpd.textContent = [0, 1, 2, 3].map(i => entry[i] || '_').join(' '); }
+    function kpPress(k) {
+      if (k === '⌫') entry = entry.slice(0, -1);
+      else if (k === '✔') check();
+      else if (entry.length < 4) { entry += k; playNote(72 + +k); if (entry.length === 4) setTimeout(check, 150); }
+      drawKp();
+    }
+    function check() {
+      if (entry === CODE) {
+        save.grannyOpen = true; persist(); kpmsg.textContent = '🔓 *click* It\'s open!'; playNote(84); playNote(88);
+        setTimeout(() => showKp(false), 700);
+        $('#zmsg', el).textContent = '🔓 You cracked the code! Granny\'s door is unlocked. Tiptoe…'; msgT = 5;
+      } else {
+        kpmsg.textContent = '❌ Wrong code!'; kp.classList.remove('shake'); void kp.offsetWidth; kp.classList.add('shake'); playNote(48, .4);
+        entry = ''; setTimeout(drawKp, 300);
+      }
+    }
+    kp.addEventListener('click', e => { const b = e.target.closest('[data-kp]'); if (b) kpPress(b.dataset.kp); });
+    $('#kpx', el).addEventListener('click', () => showKp(false));
+    const kd = e => {
+      const k = e.key.toLowerCase();
+      if (kpOpen) {
+        if (/^[0-9]$/.test(k)) kpPress(k); else if (k === 'backspace') kpPress('⌫'); else if (k === 'enter') kpPress('✔');
+        e.preventDefault(); return;
+      }
+      if ((k === 'e' || k === 'enter') && !save.grannyOpen && nearDoor()) { showKp(true); e.preventDefault(); return; }
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) { keys[k] = true; target = null; e.preventDefault(); } };
     const ku = e => { keys[e.key.toLowerCase()] = false; };
     document.addEventListener('keydown', kd); document.addEventListener('keyup', ku);
-    c.addEventListener('pointerdown', e => { target = canvasPos(c, e); c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointerdown', e => {
+      const p = canvasPos(c, e);
+      if (!save.grannyOpen && Math.hypot(p.x - LOCK.x, p.y - LOCK.y) < 30) { if (nearDoor()) showKp(true); else { target = { x: LOCK.x - 30, y: LOCK.y }; $('#zmsg', el).textContent = '🔒 Walk up to Granny\'s door first, then click the lock.'; msgT = 3; } return; }
+      target = p; c.setPointerCapture(e.pointerId);
+    });
     c.addEventListener('pointermove', e => { if (e.buttons) target = canvasPos(c, e); });
     const roomAt = (x, y) => rooms.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
     const inGranny = () => player.x > 580 && player.y < 240;
     function pushOut(p, rad) {
-      for (const [x, y, w, h] of walls) {
+      for (const [x, y, w, h] of save.grannyOpen ? walls : [...walls, DOOR]) {
         const cx = Math.max(x, Math.min(p.x, x + w)), cy = Math.max(y, Math.min(p.y, y + h));
         const dx = p.x - cx, dy = p.y - cy, d = Math.hypot(dx, dy);
         if (d < rad) { if (d > 0.01) { p.x = cx + dx / d * rad; p.y = cy + dy / d * rad; } else p.y += rad; }
@@ -1159,6 +1211,7 @@ const games = {
       if (keys.a || keys.arrowleft) dx--; if (keys.d || keys.arrowright) dx++;
       if (keys.w || keys.arrowup) dy--; if (keys.s || keys.arrowdown) dy++;
       if (!dx && !dy && target) { const tx = target.x - player.x, ty = target.y - player.y; if (Math.hypot(tx, ty) > 6) { dx = tx; dy = ty; } else target = null; }
+      if (kpOpen) { dx = 0; dy = 0; }
       if (dx || dy) { const l = Math.hypot(dx, dy); player.x += dx / l * 150 * dt; player.y += dy / l * 150 * dt; }
       pushOut(player, 13);
       // chill zombies wander
@@ -1221,6 +1274,7 @@ const games = {
       ctx.fillStyle = '#6b3f1f'; ctx.fillRect(370, 455, 60, 12);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText('FRONT DOOR', 400, 464);
       ctx.fillStyle = '#4a3a5c'; walls.forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
+      if (!save.grannyOpen) { ctx.fillStyle = '#7a4a26'; ctx.fillRect(DOOR[0] - 2, DOOR[1], DOOR[2] + 4, DOOR[3]); ctx.fillStyle = '#e6b422'; ctx.fillRect(DOOR[0] - 1, DOOR[1] + 28, 3, 4); emoji('🔒', LOCK.x, LOCK.y, 22); }
       decor.forEach(([e, x, y, s]) => s && emoji(e, x, y, s));
       emoji('🦆', 318, 64, 16);
       if (!save.bomb && !save.unlimited) { ctx.save(); ctx.shadowColor = '#ff5a3a'; ctx.shadowBlur = 10 + Math.sin(t / 180) * 6; emoji('💣', 602, 40, 22); ctx.restore(); }
@@ -1245,6 +1299,7 @@ const games = {
       }
       // bubbles on top
       for (const z of zs) if (z.near) bubble(z.x, z.y, `${z.name}: ${z.lines[z.li]}`);
+      if (!save.grannyOpen && nearDoor() && !kpOpen) bubble(LOCK.x, LOCK.y + 10, '🔒 Locked! Press E (or click the lock) to enter the code');
       if (inGranny()) bubble(granny.x, granny.y, granny.state === 'rise' ? '👵 Hmph?! WHO\'S THERE?! (getting up...)' : granny.state === 'chase' ? `👵 ${grannyChase[granny.li]}` : `👵 ${grannyIdle[Math.floor(t / 2600) % grannyIdle.length]}`, '#ffd1d1');
       raf = requestAnimationFrame(loop);
     }
