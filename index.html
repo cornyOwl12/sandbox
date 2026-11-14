@@ -160,6 +160,14 @@
   .card.up, .card.done { background: #fff; }
   .card.done { opacity: .55; cursor: default; }
 
+  .panel.wide { width: min(860px, 100%); }
+  .mountain { position: absolute; z-index: 3; cursor: pointer; transition: filter .15s, transform .15s; }
+  .mountain:hover { filter: brightness(1.1); transform: translateY(-4px); }
+  .mountain .peak { position: absolute; inset: 0; background: linear-gradient(#ffffff 0 30%, #9d9fb5 30%, #6f7189);
+    clip-path: polygon(0 100%, 30% 40%, 38% 46%, 52% 0, 64% 22%, 72% 16%, 100% 100%); }
+  .mountain .sign { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); white-space: nowrap; background: var(--cream);
+    border: 2px solid var(--ink); border-radius: 6px; padding: 2px 8px; font-weight: bold; font-size: 14px; }
+  .mountain .trike { position: absolute; left: 26%; top: 52%; font-size: 26px; transform: rotate(-35deg); }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -179,7 +187,7 @@
 <canvas id="fx"></canvas>
 <div id="scene">
   <div class="sky" id="sky"></div>
-  <span class="moon">🌙</span>
+  <span class="moon" style="left:40px">🌙</span>
   <svg class="hills" viewBox="0 0 1200 80" preserveAspectRatio="none">
     <path d="M0 60 Q150 0 300 45 T600 40 T900 30 T1200 50 V80 H0Z" fill="#4f8f4a"/>
     <path d="M0 70 Q200 30 400 62 T800 55 T1200 62 V80 H0Z" fill="#5fa653"/>
@@ -678,6 +686,190 @@ const games = {
     return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kh); };
   }},
 
+  /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
+  mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
+    el.innerHTML = `<p class="hint">Ride the tricycle to the summit flag. <b>← →</b> pedal, <b>↑ ↓</b> lean back / lean forward. Steep walls need a running start. Pedaling too hard pops a wheelie. No checkpoints. Good luck. 😇</p>
+      <div class="stats"><span id="mh">Height: 0 m</span><span id="mb">Best: 0 m</span><span id="mtm">⏱ 0:00</span></div>
+      <canvas class="game" width="800" height="460"></canvas>
+      <div class="row">
+        <button class="btn" data-k="leanB">↺ Lean back</button>
+        <button class="btn" data-k="back">◀ Pedal</button>
+        <button class="btn" data-k="fwd">Pedal ▶</button>
+        <button class="btn" data-k="leanF">Lean fwd ↻</button>
+        <button class="btn" id="mreset">🔄 Start over</button>
+      </div><p class="msg" id="mmsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d'), CW = 800, CH = 460;
+    // mountain outline: [x, height]
+    const P = [[-300, 900], [-300, 0], [300, 0], [520, 60], [540, 60], [546, 71], [700, 83], [900, 193], [930, 205], [955, 240], [1060, 247],
+      [1100, 231], [1180, 231], [1240, 281], [1250, 293], [1300, 295], [1320, 295], [1330, 235], [1460, 235], [1620, 330], [1700, 335],
+      [1900, 453], [1915, 478], [1990, 483], [2300, 660], [2330, 670], [2342, 682], [2420, 685], [2470, 730], [2490, 740], [2540, 708],
+      [2600, 708], [2800, 828], [2830, 840], [2848, 868], [2900, 873], [2960, 878], [3040, 960], [3060, 970], [3400, 970], [3400, 1600]];
+    const segs = [];
+    for (let i = 0; i < P.length - 1; i++) segs.push([P[i][0], -P[i][1], P[i + 1][0], -P[i + 1][1]]);
+    const SUMMIT_X = 3060, FLAG_X = 3200, TOP = 970;
+    const signs = [[340, 0, 'Mt. Wobblemore ⛰️ no refunds'], [1400, 235, 'Halfway-ish'], [2390, 684, 'Turn back?'], [2925, 875, 'Almost!!']];
+    const taunts = ['Gravity: 1, You: 0', 'The mountain sends its regards.', 'Tricycles were not designed for this.', 'That was a learning experience.',
+      'Wheee! (not the good kind)', 'Somewhere, a goat is laughing.', 'Have you tried NOT falling?', 'Back to the bottom, champ.'];
+    const G = 900, H = 1 / 240, DRIVE = 220, MAXC = .055, ALPHA = 30, REACT = .5;
+    const keys = {};
+    let R, F, S, pts, L, cam, best, start, won, tauntShown, raf, acc, last;
+    function reset() {
+      R = { x: 40, y: -11, r: 10, w: 1, ang: 0 };
+      F = { x: 84, y: -16, r: 15, w: 1, ang: 0 };
+      S = { x: 56, y: -52, r: 10, w: .55, ang: 0 };
+      pts = [R, F, S];
+      pts.forEach(p => { p.vx = 0; p.vy = 0; p.px = p.x; p.py = p.y; p.n = null; p.spin = 0; });
+      const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      L = [[R, F, d(R, F)], [R, S, d(R, S)], [F, S, d(F, S)]];
+      cam = { x: 60, y: -40 }; best = 0; start = performance.now(); won = false; tauntShown = false; acc = 0;
+      $('#mmsg', el).textContent = '';
+    }
+    function closest(px, py, s) {
+      const dx = s[2] - s[0], dy = s[3] - s[1];
+      let t = ((px - s[0]) * dx + (py - s[1]) * dy) / (dx * dx + dy * dy);
+      t = Math.max(0, Math.min(1, t));
+      return [s[0] + dx * t, s[1] + dy * t];
+    }
+    function collide(p) {
+      for (const s of segs) {
+        const [cx, cy] = closest(p.x, p.y, s);
+        const dx = p.x - cx, dy = p.y - cy, d = Math.hypot(dx, dy);
+        if (d < p.r && d > 1e-6) {
+          const nx = dx / d, ny = dy / d;
+          p.x += nx * (p.r - d); p.y += ny * (p.r - d);
+          p.n = [nx, ny];
+        }
+      }
+    }
+    function step() {
+      const pedal = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
+      let lean = (keys.leanF ? 1 : 0) - (keys.leanB ? 1 : 0);
+      if (pedal && F.n) lean -= pedal * REACT; // pedaling hard pops a wheelie
+      for (const p of pts) { p.px = p.x; p.py = p.y; p.vy += G * H; p.x += p.vx * H; p.y += p.vy * H; p.n = null; }
+      if (lean) {
+        const tw = pts.reduce((s, p) => s + 1 / p.w, 0);
+        const cx = pts.reduce((s, p) => s + p.x / p.w, 0) / tw, cy = pts.reduce((s, p) => s + p.y / p.w, 0) / tw;
+        const k = lean * ALPHA * H * H;
+        for (const p of pts) { const rx = p.x - cx, ry = p.y - cy; p.x += -ry * k; p.y += rx * k; }
+      }
+      for (let it = 0; it < 8; it++) {
+        for (const [a, b, len] of L) {
+          const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
+          const diff = (d - len) / d / (a.w + b.w);
+          a.x += dx * diff * a.w; a.y += dy * diff * a.w;
+          b.x -= dx * diff * b.w; b.y -= dy * diff * b.w;
+        }
+        pts.forEach(collide);
+      }
+      for (const p of pts) {
+        if (p.n) {
+          const tx = -p.n[1], ty = p.n[0];
+          const tan = (p.x - p.px) * tx + (p.y - p.py) * ty;
+          let corr;
+          const cap = MAXC * Math.max(0, -p.n[1]); // less grip on steep ground
+          if (p === F && pedal) corr = Math.max(-cap, Math.min(cap, (pedal * DRIVE * H - tan) * .5));
+          else if (p === S) corr = -tan * .7;
+          else corr = -tan * .004;
+          p.x += tx * corr; p.y += ty * corr;
+          p.spin = (tan + corr) / p.r / H;
+        } else if (p === F && pedal) {
+          p.spin += (pedal * DRIVE / p.r - p.spin) * .05;
+        }
+        p.ang += p.spin * H;
+        p.vx = (p.x - p.px) / H * .9998; p.vy = (p.y - p.py) / H * .9998;
+      }
+    }
+    const kmap = { ArrowRight: 'fwd', ArrowLeft: 'back', ArrowUp: 'leanB', ArrowDown: 'leanF' };
+    const kd = e => { if (kmap[e.key]) { keys[kmap[e.key]] = true; e.preventDefault(); } };
+    const ku = e => { if (kmap[e.key]) keys[kmap[e.key]] = false; };
+    document.addEventListener('keydown', kd); document.addEventListener('keyup', ku);
+    el.querySelectorAll('[data-k]').forEach(b => {
+      const on = e => { e.preventDefault(); keys[b.dataset.k] = true; }, off = () => { keys[b.dataset.k] = false; };
+      b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+    });
+    $('#mreset', el).addEventListener('click', reset);
+
+    const sx = x => x - cam.x + CW / 2, sy = y => y - cam.y + CH * .58;
+    function draw(t) {
+      const sk = ctx.createLinearGradient(0, 0, 0, CH);
+      sk.addColorStop(0, '#5ab8f0'); sk.addColorStop(1, '#d9f1ff');
+      ctx.fillStyle = sk; ctx.fillRect(0, 0, CW, CH);
+      // far hills (parallax)
+      ctx.fillStyle = '#b8d9c4';
+      ctx.beginPath(); ctx.moveTo(0, CH);
+      for (let x = 0; x <= CW; x += 20) ctx.lineTo(x, CH * .7 + Math.sin((x + cam.x * .2) / 90) * 30 - Math.max(-60, Math.min(120, -cam.y * .08)));
+      ctx.lineTo(CW, CH); ctx.fill();
+      // mountain body
+      const g = ctx.createLinearGradient(0, sy(-TOP), 0, sy(0));
+      g.addColorStop(0, '#f4f7fb'); g.addColorStop(.32, '#c9c6cf'); g.addColorStop(.6, '#9a8a78'); g.addColorStop(1, '#7a6a55');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(sx(segs[0][0]), sy(segs[0][1]));
+      for (const s of segs) ctx.lineTo(sx(s[2]), sy(s[3]));
+      ctx.lineTo(sx(3400), sy(600)); ctx.lineTo(sx(-300), sy(600)); ctx.closePath(); ctx.fill();
+      ctx.lineWidth = 6; ctx.lineCap = 'round';
+      for (const s of segs) {
+        ctx.strokeStyle = -s[1] > 700 ? '#ffffff' : -s[1] > 420 ? '#8bb06a' : '#4f9a43';
+        ctx.beginPath(); ctx.moveTo(sx(s[0]), sy(s[1])); ctx.lineTo(sx(s[2]), sy(s[3])); ctx.stroke();
+      }
+      // signs
+      ctx.textAlign = 'center'; ctx.font = 'bold 12px Trebuchet MS';
+      for (const [x, h, txt] of signs) {
+        const X = sx(x), Y = sy(-h);
+        if (X < -150 || X > CW + 150) continue;
+        ctx.fillStyle = '#6b3f1f'; ctx.fillRect(X - 2, Y - 34, 4, 34);
+        const w = ctx.measureText(txt).width + 14;
+        ctx.fillRect(X - w / 2 - 2, Y - 54, w + 4, 24); ctx.fillStyle = '#fff3d6'; ctx.fillRect(X - w / 2, Y - 52, w, 20);
+        ctx.fillStyle = '#2b1d3a'; ctx.fillText(txt, X, Y - 38);
+      }
+      // summit flag
+      const fx = sx(FLAG_X), fy = sy(-TOP);
+      ctx.fillStyle = '#555'; ctx.fillRect(fx - 2, fy - 80, 4, 80);
+      ctx.fillStyle = '#e8364f'; ctx.beginPath(); ctx.moveTo(fx + 2, fy - 80); ctx.lineTo(fx + 44, fy - 68 + Math.sin(t / 200) * 3); ctx.lineTo(fx + 2, fy - 56); ctx.fill();
+      ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 14px Trebuchet MS'; ctx.fillText('SUMMIT', fx, fy + 22);
+      // tricycle
+      const ang = Math.atan2(F.y - R.y, F.x - R.x);
+      const wheel = (p, col) => {
+        ctx.save(); ctx.translate(sx(p.x), sy(p.y)); ctx.rotate(p.ang);
+        ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, p.r - 4, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(i * Math.PI / 2) * (p.r - 4), Math.sin(i * Math.PI / 2) * (p.r - 4)); ctx.stroke(); }
+        ctx.restore();
+      };
+      wheel({ ...R, x: R.x - 3 }, '#9aa'); // far rear wheel peeking out
+      ctx.strokeStyle = '#e8364f'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      const mx = R.x + (F.x - R.x) * .35, my = R.y + (F.y - R.y) * .35;
+      ctx.beginPath(); ctx.moveTo(sx(R.x), sy(R.y)); ctx.lineTo(sx(mx), sy(my)); ctx.lineTo(sx(F.x), sy(F.y)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx(mx), sy(my)); ctx.lineTo(sx(S.x * .7 + mx * .3), sy(S.y * .7 + my * .3)); ctx.stroke();
+      const hbx = F.x + (S.x - F.x) * .55, hby = F.y + (S.y - F.y) * .55;
+      ctx.beginPath(); ctx.moveTo(sx(F.x), sy(F.y)); ctx.lineTo(sx(hbx), sy(hby)); ctx.stroke();
+      wheel(R, '#cfd'); wheel(F, '#ffd84a');
+      ctx.save(); ctx.translate(sx(S.x), sy(S.y)); ctx.rotate(ang);
+      ctx.font = '30px serif'; ctx.textBaseline = 'middle'; ctx.fillText('🧒', 0, -4); ctx.restore();
+      ctx.textBaseline = 'alphabetic';
+    }
+    function loop(t) {
+      acc += Math.min((t - last) / 1000, .1); last = t;
+      let n = 0;
+      while (acc >= H && n < 12) { step(); acc -= H; n++; }
+      if (n === 12) acc = 0;
+      const cx = (R.x + F.x + S.x) / 3, cy = (R.y + F.y + S.y) / 3;
+      cam.x += (cx - cam.x) * .12; cam.y += (cy - cam.y) * .12;
+      const h = Math.max(0, Math.round(-cy / 10));
+      if (h > best) { best = h; tauntShown = false; if (!won) $('#mmsg', el).textContent = ''; }
+      if (!won && !tauntShown && best - h > 12) { tauntShown = true; $('#mmsg', el).textContent = pick(taunts); }
+      if (!won && R.x > SUMMIT_X && F.x > SUMMIT_X && -R.y > TOP - 30) {
+        won = true;
+        const s = Math.round((performance.now() - start) / 1000);
+        $('#mmsg', el).textContent = `🏔️ YOU CONQUERED MOUNT WOBBLEMORE in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}! Legendary.`;
+      }
+      $('#mh', el).textContent = `Height: ${h} m`; $('#mb', el).textContent = `Best: ${best} m`;
+      if (!won) { const s = Math.floor((performance.now() - start) / 1000); $('#mtm', el).textContent = `⏱ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+      draw(t);
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); last = performance.now(); raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); document.removeEventListener('keyup', ku); };
+  }},
 };
 
 /* ---------------- town layout (scene is 1200 x 900) ---------------- */
@@ -723,6 +915,11 @@ const places = [
 ];
 places.forEach(b => add(building(b)));
 
+// the mountain on the horizon
+add(`<div class="mountain" data-key="mountain" style="left:880px;top:30px;width:250px;height:175px">
+  <div class="peak"></div><span class="trike">🚲</span><span class="sign">⛰️ Mount Wobblemore</span><span class="play-tag">🎮 Trike Climb</span>
+</div>`);
+
 // horse paddock (part of the stables)
 add(`<div class="paddock" data-key="stable" style="left:236px;top:236px;width:305px;height:150px">
   <span class="sign" style="top:-16px">🐎 Paddock</span>
@@ -743,7 +940,7 @@ add(`<div class="pond" data-key="rink" style="left:40px;top:492px;width:330px;he
 add(`<div class="fountain" style="left:533px;top:768px;width:130px;height:130px">⛲</div>`);
 add(`<div class="welcome" style="left:845px;top:770px">Welcome to 🌷 Tulip PIE 🥧<br><span style="font-weight:normal;font-size:13px">Population: 47 people &amp; 112 ducks</span></div>`);
 add(`<div class="tree" style="left:885px;top:850px;font-size:28px;letter-spacing:4px">🌷🌷🌼🌷🌷🌼🌷🌷</div>`);
-[[490, 770], [700, 800], [760, 855], [205, 200], [935, 200], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
+[[490, 770], [700, 800], [760, 855], [205, 200], [1150, 196], [945, 470], [380, 480], [1160, 420 - 60], [1150, 700 - 50]]
   .forEach(([x, y]) => add(`<span class="tree" style="left:${x}px;top:${y}px">${pick(['🌳', '🌲', '🌳'])}</span>`));
 add(`<span class="mover" style="left:700px;top:760px;font-size:24px;--d:70px;animation:pace 5s ease-in-out infinite">🦆</span>`);
 add(`<span class="mover" style="left:740px;top:770px;font-size:20px;--d:50px;animation:pace 4s ease-in-out infinite -1s">🦆</span>`);
@@ -788,6 +985,7 @@ function openGame(key) {
   closeGame();
   const g = games[key];
   $('#mtitle').textContent = g.title;
+  $('.panel').classList.toggle('wide', key === 'mountain');
   $('#modal').classList.remove('hidden');
   cleanup = g.start($('#game')) || null;
 }
@@ -842,7 +1040,7 @@ let lastT = performance.now();
     if (dx || dy) {
       const len = Math.hypot(dx, dy), sp = 260;
       player.x = Math.max(15, Math.min(1185, player.x + dx / len * sp * dt));
-      player.y = Math.max(215, Math.min(895, player.y + dy / len * sp * dt));
+      player.y = Math.max(205, Math.min(895, player.y + dy / len * sp * dt));
       if (dx) playerEl.classList.toggle('left', dx < 0);
       const hit = solids().find(r => player.x > r.x + 6 && player.x < r.x + r.w - 6 && player.y > r.y + 10 && player.y < r.y + r.h + 4);
       if (hit) { Object.keys(keys).forEach(k => keys[k] = false); lastPlace = hit; openGame(hit.key); }

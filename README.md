@@ -13,5 +13,6 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🧦 Lost Sock Office | Memory match: reunite the pairs |
 | 💅 Glitter Claws Nails | Polish Panic: paint nails to match each customer |
 | 🪙 The Penny House | Penny Press: stamp pennies with perfect timing |
+| ⛰️ Mount Wobblemore | Trike Climb: a Getting-Over-It-style climb… on a tricycle |
 
 Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.
