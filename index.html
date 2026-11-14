@@ -1,172 +1,599 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World — Fireworks</title>
-  <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      overflow: hidden;
-      background: #05060f;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      cursor: crosshair;
-      user-select: none;
-    }
-    canvas { display: block; }
-    #hello {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      color: #fff;
-      text-align: center;
-    }
-    #hello h1 {
-      margin: 0;
-      font-size: clamp(2.5rem, 8vw, 6rem);
-      letter-spacing: 0.02em;
-      text-shadow: 0 0 24px rgba(255,255,255,0.35);
-    }
-    #hello p {
-      margin: 0.75rem 0 0;
-      opacity: 0.6;
-      font-size: clamp(0.9rem, 2vw, 1.2rem);
-      transition: opacity 1s;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tulip PIE 🌷🥧</title>
+<style>
+  :root {
+    --ink: #2b1d3a;
+    --cream: #fff8ec;
+  }
+  * { box-sizing: border-box; }
+  html { background: #5fae55; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: "Trebuchet MS", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(#1b1747 0%, #4a2c6e 28%, #c45a7a 48%, #f6a65b 58%, #7cc46a 58.2%, #5fae55 100%);
+    background-attachment: fixed;
+    overflow-x: hidden;
+    user-select: none;
+  }
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+
+  header { text-align: center; padding: 28px 12px 10px; color: #fff; cursor: crosshair; }
+  header h1 {
+    margin: 0; font-size: clamp(2.6rem, 8vw, 5.5rem); letter-spacing: .03em;
+    text-shadow: 0 4px 0 #8a3b6b, 0 0 30px rgba(255,200,230,.5);
+  }
+  header p { margin: 6px 0 0; opacity: .85; font-size: clamp(.95rem, 2vw, 1.15rem); }
+  .sky-gap { height: 18vh; cursor: crosshair; }
+
+  .street-wrap { position: relative; padding: 0 16px 40px; }
+  .town {
+    display: grid; gap: 22px; max-width: 1100px; margin: 0 auto;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    position: relative; z-index: 2;
+  }
+  .building {
+    position: relative; cursor: pointer; border: none; padding: 0; background: none;
+    font: inherit; color: inherit; text-align: center;
+    transition: transform .15s;
+  }
+  .building:hover, .building:focus-visible { transform: translateY(-6px) rotate(-1deg); outline: none; }
+  .roof {
+    height: 54px; margin: 0 10px;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  .walls {
+    border-radius: 0 0 10px 10px; padding: 14px 10px 12px;
+    box-shadow: 0 8px 0 rgba(0,0,0,.18);
+    border: 3px solid rgba(0,0,0,.15); border-top: none;
+  }
+  .walls .emoji { font-size: 58px; line-height: 1; display: block; filter: drop-shadow(0 3px 0 rgba(0,0,0,.15)); }
+  .sign {
+    display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 6px;
+    background: var(--cream); font-weight: bold; font-size: .95rem; border: 2px solid var(--ink);
+  }
+  .tagline { display: block; font-size: .78rem; margin-top: 6px; opacity: .8; }
+
+  .road {
+    max-width: 1100px; margin: 34px auto 0; height: 70px; background: #44404f; border-radius: 12px;
+    position: relative; overflow: hidden; box-shadow: inset 0 -6px 0 rgba(0,0,0,.25);
+  }
+  .road::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 33px; height: 4px;
+    background: repeating-linear-gradient(90deg, #ffd84a 0 30px, transparent 30px 60px);
+  }
+  .car { position: absolute; top: 12px; font-size: 38px; animation: drive 9s linear infinite; }
+  .car.b { top: 22px; animation-duration: 13s; animation-delay: -5s; }
+  @keyframes drive { from { left: -60px; } to { left: 100%; } }
+  .flowers { text-align: center; font-size: 26px; letter-spacing: 10px; margin-top: 14px; }
+
+  /* modal */
+  #modal {
+    position: fixed; inset: 0; background: rgba(20, 10, 35, .6); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 14px;
+  }
+  #modal.hidden { display: none; }
+  .panel {
+    background: var(--cream); border-radius: 18px; border: 4px solid var(--ink);
+    width: min(560px, 100%); max-height: 94vh; overflow: auto; padding: 18px 18px 22px; position: relative;
+    box-shadow: 0 12px 0 rgba(0,0,0,.25);
+  }
+  .panel h2 { margin: 0 34px 10px 0; font-size: 1.35rem; }
+  #close {
+    position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 50%;
+    border: 2px solid var(--ink); background: #ffd1dc; font-size: 18px; cursor: pointer;
+  }
+  .hint { margin: 0 0 10px; font-size: .95rem; }
+  .msg { min-height: 1.4em; font-weight: bold; text-align: center; margin: 10px 0 0; font-size: 1.1rem; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+  button.btn {
+    font: inherit; font-weight: bold; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+    border: 2px solid var(--ink); background: #ffe27a; box-shadow: 0 3px 0 var(--ink);
+  }
+  button.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  button.btn:disabled { opacity: .45; cursor: default; }
+  button.big { font-size: 1.3rem; padding: 12px 26px; }
+  canvas.game { display: block; width: 100%; height: auto; border-radius: 12px; border: 3px solid var(--ink); touch-action: none; }
+  .stats { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; }
+
+  /* derby */
+  .track { background: #c99a5b; border-radius: 12px; border: 3px solid var(--ink); padding: 6px; }
+  .lane { position: relative; height: 54px; border-bottom: 2px dashed rgba(255,255,255,.5); }
+  .lane:last-child { border-bottom: none; }
+  .lane .name { position: absolute; left: 4px; top: 2px; font-size: .7rem; font-weight: bold; color: #fff; }
+  .lane .horse { position: absolute; top: 8px; font-size: 38px; transform: scaleX(-1); transition: left .08s linear; }
+  .lane .finish { position: absolute; right: 4px; top: 10px; font-size: 30px; }
+
+  /* lemonade */
+  .counter { display: flex; gap: 14px; align-items: center; justify-content: center; margin: 6px 0; }
+  .customer { font-size: 64px; }
+  .bubble { background: #fff; border: 2px solid var(--ink); border-radius: 14px; padding: 8px 12px; font-size: 1.4rem; min-width: 150px; text-align: center; }
+  .cup { text-align: center; font-size: 1.5rem; min-height: 2.2em; background: #fff3b0; border-radius: 10px; padding: 6px; border: 2px dashed var(--ink); }
+
+  /* crayons */
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 8px 0; }
+  .swatch { width: 30px; height: 44px; border-radius: 6px 6px 3px 3px; border: 2px solid var(--ink); cursor: pointer; clip-path: polygon(50% 0, 100% 22%, 100% 100%, 0 100%, 0 22%); }
+  .swatch.on { outline: 3px solid var(--ink); outline-offset: 2px; transform: translateY(-4px); }
+  .gallery { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+  .gallery img { width: 90px; border: 6px solid #b8862b; border-radius: 4px; background: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+
+  /* hats */
+  .wanted { text-align: center; font-size: 1.2rem; }
+  .wanted .big-hat { font-size: 70px; display: block; }
+  .hatgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .hatgrid button { font-size: 42px; padding: 10px; border-radius: 12px; border: 2px solid var(--ink); background: #fff; cursor: pointer; }
+  .hatgrid button:hover { background: #ffe9f0; }
+
+  /* socks */
+  .memgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .card {
+    aspect-ratio: 1; font-size: 40px; border-radius: 12px; border: 2px solid var(--ink); cursor: pointer;
+    background: repeating-linear-gradient(45deg, #9ad0f5 0 10px, #b9e0fb 10px 20px);
+  }
+  .card.up, .card.done { background: #fff; }
+  .card.done { opacity: .55; cursor: default; }
+
+  /* bakery */
+  .pie-btn { font-size: 110px; background: none; border: none; cursor: pointer; display: block; margin: 0 auto; transition: transform .07s; }
+  .pie-btn:active { transform: scale(.9) rotate(-6deg); }
+  .shop { display: grid; gap: 8px; margin-top: 10px; }
+  .shop button { text-align: left; }
+</style>
 </head>
 <body>
-  <canvas id="sky"></canvas>
-  <div id="hello">
-    <h1>Hello, World!</h1>
-    <p id="hint">Click anywhere to launch fireworks</p>
+<canvas id="fx"></canvas>
+
+<header id="sky">
+  <h1>🌷 Tulip PIE 🥧</h1>
+  <p>Click a building to play a game • Click the sky for fireworks</p>
+</header>
+<div class="sky-gap" id="skygap"></div>
+
+<div class="street-wrap">
+  <div class="town" id="town"></div>
+  <div class="road"><span class="car">🚗</span><span class="car b">🚌</span></div>
+  <div class="flowers">🌷🌳🌷🌼🌷🌳🌷🌼🌷🌳🌷</div>
+</div>
+
+<div id="modal" class="hidden" role="dialog" aria-modal="true">
+  <div class="panel">
+    <button id="close" aria-label="Close">✕</button>
+    <h2 id="mtitle"></h2>
+    <div id="game"></div>
   </div>
+</div>
 
-  <script>
-    const canvas = document.getElementById('sky');
-    const ctx = canvas.getContext('2d');
-    const hint = document.getElementById('hint');
-    let W, H, dpr;
+<script>
+/* ---------------- helpers ---------------- */
+const $ = (s, el = document) => el.querySelector(s);
+const rand = (a, b) => Math.random() * (b - a) + a;
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function canvasPos(c, e) {
+  const r = c.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height };
+}
 
-    function resize() {
-      dpr = window.devicePixelRatio || 1;
-      W = window.innerWidth;
-      H = window.innerHeight;
-      canvas.width = W * dpr;
-      canvas.height = H * dpr;
-      canvas.style.width = W + 'px';
-      canvas.style.height = H + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+/* ---------------- fireworks ---------------- */
+const fx = $('#fx'), fctx = fx.getContext('2d');
+let FW, FH;
+function resizeFx() {
+  const d = window.devicePixelRatio || 1;
+  FW = innerWidth; FH = innerHeight;
+  fx.width = FW * d; fx.height = FH * d; fctx.setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener('resize', resizeFx); resizeFx();
+const rockets = [], sparks = [];
+function launch(x, y) {
+  const sx = x + rand(-40, 40), sy = FH;
+  const dist = Math.hypot(x - sx, y - sy) || 1, sp = 12;
+  rockets.push({ x: sx, y: sy, px: sx, py: sy, tx: x, ty: y, vx: (x - sx) / dist * sp, vy: (y - sy) / dist * sp, hue: rand(0, 360) });
+}
+function burst(x, y, hue) {
+  const n = 80 + Math.random() * 60;
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), s = rand(1, 7);
+    sparks.push({ x, y, px: x, py: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, hue: hue + rand(-25, 25), life: 1, decay: rand(.01, .022) });
+  }
+}
+(function fxLoop() {
+  fctx.clearRect(0, 0, FW, FH);
+  fctx.globalCompositeOperation = 'lighter';
+  fctx.lineCap = 'round';
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i];
+    r.px = r.x; r.py = r.y; r.x += r.vx; r.y += r.vy;
+    fctx.strokeStyle = `hsl(${r.hue},100%,75%)`; fctx.lineWidth = 3;
+    fctx.beginPath(); fctx.moveTo(r.px - r.vx * 2, r.py - r.vy * 2); fctx.lineTo(r.x, r.y); fctx.stroke();
+    if (r.y <= r.ty) { burst(r.tx, r.ty, r.hue); rockets.splice(i, 1); }
+  }
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.px = p.x; p.py = p.y;
+    p.vx *= .97; p.vy = p.vy * .97 + .07; p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+    if (p.life <= 0) { sparks.splice(i, 1); continue; }
+    fctx.strokeStyle = `hsla(${p.hue},100%,${55 + p.life * 25}%,${p.life})`; fctx.lineWidth = 2.5;
+    fctx.beginPath(); fctx.moveTo(p.px - p.vx * 2, p.py - p.vy * 2); fctx.lineTo(p.x, p.y); fctx.stroke();
+  }
+  fctx.globalCompositeOperation = 'source-over';
+  requestAnimationFrame(fxLoop);
+})();
+document.addEventListener('pointerdown', e => {
+  if (!$('#modal').classList.contains('hidden')) return;
+  if (e.target.closest('.building, .road, #modal')) return;
+  launch(e.clientX, e.clientY);
+});
+
+/* ---------------- games ---------------- */
+const galleryImgs = [];
+const games = {
+
+  /* 🐴 Pony Derby */
+  stable: { title: '🐴 Hoofbeat Stables: Pony Derby', start(el) {
+    const names = ['Buttercup (you!)', 'Sir Neighs-a-Lot', 'Pickles'];
+    el.innerHTML = `<p class="hint">You ride <b>Buttercup</b> in the top lane. Mash the button (or Space) to gallop!</p>
+      <div class="track">${names.map((n, i) => `<div class="lane"><span class="name">${n}</span><span class="horse" id="h${i}">${i === 0 ? '🐎' : '🐴'}</span><span class="finish">🏁</span></div>`).join('')}</div>
+      <div class="row"><button class="btn big" id="gallop">Giddy-up!</button></div><p class="msg" id="dmsg"></p>`;
+    const horses = [0, 1, 2].map(i => $('#h' + i, el)), msg = $('#dmsg', el), btn = $('#gallop', el);
+    let pos, state, iv, cd;
+    const draw = () => horses.forEach((h, i) => h.style.left = (Math.min(pos[i], 100) * .82) + '%');
+    function countdown() {
+      pos = [0, 0, 0]; draw(); state = 'wait'; btn.textContent = 'Giddy-up!';
+      let n = 3; msg.textContent = n;
+      cd = setInterval(() => { n--; if (n > 0) msg.textContent = n; else { clearInterval(cd); msg.textContent = 'GO!'; state = 'run'; iv = setInterval(tick, 100); } }, 700);
     }
-    window.addEventListener('resize', resize);
-    resize();
-
-    const rockets = [];
-    const particles = [];
-
-    class Rocket {
-      constructor(tx, ty) {
-        this.x = tx + (Math.random() - 0.5) * 40;
-        this.y = H;
-        this.tx = tx;
-        this.ty = ty;
-        const dist = Math.hypot(this.tx - this.x, this.ty - this.y);
-        const speed = 11;
-        this.vx = (this.tx - this.x) / dist * speed;
-        this.vy = (this.ty - this.y) / dist * speed;
-        this.hue = Math.floor(Math.random() * 360);
-        this.trail = [];
-      }
-      update() {
-        this.trail.push([this.x, this.y]);
-        if (this.trail.length > 8) this.trail.shift();
-        this.x += this.vx;
-        this.y += this.vy;
-        return this.y <= this.ty; // reached target
-      }
-      draw() {
-        ctx.beginPath();
-        const [sx, sy] = this.trail[0] || [this.x, this.y];
-        ctx.moveTo(sx, sy);
-        ctx.lineTo(this.x, this.y);
-        ctx.strokeStyle = `hsl(${this.hue}, 100%, 75%)`;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
+    function tick() { for (let i = 1; i < 3; i++) pos[i] += rand(.12, .78); check(); draw(); }
+    function check() {
+      const w = pos.findIndex(p => p >= 100);
+      if (w < 0) return;
+      state = 'done'; clearInterval(iv);
+      msg.textContent = w === 0 ? '🏆 Buttercup wins! You are a champion jockey!' : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
+      btn.textContent = 'Race again';
     }
+    function gallop() { if (state === 'run') { pos[0] += 2.1; check(); draw(); } else if (state === 'done') countdown(); }
+    btn.addEventListener('click', () => { gallop(); btn.blur(); });
+    const kh = e => { if (e.code === 'Space') { e.preventDefault(); gallop(); } };
+    document.addEventListener('keydown', kh);
+    countdown();
+    return () => { clearInterval(iv); clearInterval(cd); document.removeEventListener('keydown', kh); };
+  }},
 
-    class Particle {
-      constructor(x, y, hue) {
-        this.x = x;
-        this.y = y;
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 6 + 1;
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed;
-        this.hue = hue + (Math.random() * 40 - 20);
-        this.life = 1;
-        this.decay = Math.random() * 0.015 + 0.01;
-        this.size = Math.random() * 2 + 1;
-      }
-      update() {
-        this.vx *= 0.98;
-        this.vy *= 0.98;
-        this.vy += 0.06; // gravity
-        this.x += this.vx;
-        this.y += this.vy;
-        this.life -= this.decay;
-        return this.life <= 0;
-      }
-      draw() {
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${this.hue}, 100%, ${50 + this.life * 30}%, ${this.life})`;
-        ctx.fill();
-      }
-    }
-
-    function explode(x, y, hue) {
-      const count = 90 + Math.floor(Math.random() * 60);
-      for (let i = 0; i < count; i++) particles.push(new Particle(x, y, hue));
-    }
-
-    function launch(e) {
-      const x = e.clientX ?? (e.touches && e.touches[0].clientX);
-      const y = e.clientY ?? (e.touches && e.touches[0].clientY);
-      rockets.push(new Rocket(x, y));
-      hint.style.opacity = 0;
-    }
-    canvas.addEventListener('pointerdown', launch);
-
-    function loop() {
-      // fading trail effect
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = 'rgba(5, 6, 15, 0.2)';
-      ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'lighter';
-
-      for (let i = rockets.length - 1; i >= 0; i--) {
-        const r = rockets[i];
-        if (r.update()) {
-          explode(r.tx, r.ty, r.hue);
-          rockets.splice(i, 1);
-        } else {
-          r.draw();
+  /* ⛸️ Snowflake Catch */
+  rink: { title: '⛸️ Frosty Loop Rink: Snowflake Catch', start(el) {
+    el.innerHTML = `<p class="hint">Move your skater (mouse, finger, or ← →). Catch ❄️ for 1 point and ⭐ for 5. Dodge the 🐧 penguins!</p>
+      <div class="stats"><span id="sc">Score: 0</span><span id="tm">⏱ 30</span></div>
+      <canvas class="game" width="480" height="320"></canvas>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    let x, items, score, timeLeft, last, raf, spawn, over, keys = {};
+    function reset() { x = 240; items = []; score = 0; timeLeft = 30; spawn = 0; over = false; last = performance.now(); }
+    c.addEventListener('pointermove', e => { x = canvasPos(c, e).x; });
+    c.addEventListener('pointerdown', e => { if (over) reset(); x = canvasPos(c, e).x; });
+    const kd = e => { keys[e.key] = true; }, ku = e => { keys[e.key] = false; };
+    document.addEventListener('keydown', kd); document.addEventListener('keyup', ku);
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (!over) {
+        timeLeft -= dt;
+        if (keys.ArrowLeft) x -= 320 * dt;
+        if (keys.ArrowRight) x += 320 * dt;
+        x = Math.max(20, Math.min(460, x));
+        spawn -= dt;
+        if (spawn <= 0) {
+          spawn = rand(.25, .55);
+          const r = Math.random();
+          items.push({ x: rand(20, 460), y: -20, v: rand(90, 170), k: r < .1 ? '⭐' : r < .3 ? '🐧' : '❄️' });
         }
+        for (let i = items.length - 1; i >= 0; i--) {
+          const it = items[i]; it.y += it.v * dt;
+          if (it.y > 268 && it.y < 310 && Math.abs(it.x - x) < 30) {
+            score += it.k === '⭐' ? 5 : it.k === '🐧' ? -3 : 1; items.splice(i, 1);
+          } else if (it.y > 340) items.splice(i, 1);
+        }
+        if (timeLeft <= 0) { timeLeft = 0; over = true; }
       }
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        if (p.update()) particles.splice(i, 1);
-        else p.draw();
+      const g = ctx.createLinearGradient(0, 0, 0, 320); g.addColorStop(0, '#dff4ff'); g.addColorStop(1, '#a9dcf7');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 320);
+      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(240, 300, 60 + i * 50, 18 + i * 8, 0, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '28px serif'; items.forEach(it => ctx.fillText(it.k, it.x, it.y));
+      ctx.font = '44px serif'; ctx.fillText('⛸️', x, 288);
+      if (over) {
+        ctx.fillStyle = 'rgba(43,29,58,.75)'; ctx.fillRect(0, 110, 480, 100);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 26px Trebuchet MS';
+        ctx.fillText(`Time! You scored ${score}`, 240, 145);
+        ctx.font = '18px Trebuchet MS'; ctx.fillText('Click to skate again', 240, 180);
       }
-      requestAnimationFrame(loop);
+      $('#sc', el).textContent = 'Score: ' + score; $('#tm', el).textContent = '⏱ ' + Math.ceil(timeLeft);
+      raf = requestAnimationFrame(loop);
     }
-    loop();
-  </script>
+    reset(); raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); document.removeEventListener('keyup', ku); };
+  }},
+
+  /* 🍋 Lemonade Rush */
+  lemonade: { title: "🍋 Lulu's Lemonade: Lemonade Rush", start(el) {
+    el.innerHTML = `<p class="hint">Make each cup exactly how the customer asks, then serve it! You have 45 seconds.</p>
+      <div class="stats"><span id="money">💰 $0</span><span id="ltime">⏱ 45</span></div>
+      <div class="counter"><span class="customer" id="cust">🧒</span><div class="bubble" id="order"></div></div>
+      <div class="cup" id="cup">🥤 empty cup</div>
+      <div class="row">
+        <button class="btn" data-add="l">+ 🍋 Lemon</button>
+        <button class="btn" data-add="s">+ 🍬 Sugar</button>
+        <button class="btn" data-add="i">+ 🧊 Ice</button>
+      </div>
+      <div class="row"><button class="btn" id="dump">🗑️ Dump</button><button class="btn big" id="serve">Serve!</button></div>
+      <p class="msg" id="lmsg"></p>`;
+    const people = ['🧒', '👵', '🧑‍🚀', '🤠', '🧙', '👨‍🍳', '🦸', '🧛', '👸', '🐶'];
+    let order, cup, money, time, iv;
+    const icons = { l: '🍋', s: '🍬', i: '🧊' };
+    const show = o => ['l', 's', 'i'].map(k => icons[k].repeat(o[k])).join(' ') || 'plain water?';
+    function newCustomer() {
+      order = { l: Math.floor(rand(1, 4)), s: Math.floor(rand(0, 3)), i: Math.floor(rand(0, 4)) };
+      $('#cust', el).textContent = pick(people);
+      $('#order', el).textContent = show(order);
+      cup = { l: 0, s: 0, i: 0 }; drawCup();
+    }
+    function drawCup() { const t = show(cup); $('#cup', el).textContent = (cup.l + cup.s + cup.i) ? '🥤 ' + t : '🥤 empty cup'; }
+    function setEnabled(on) { el.querySelectorAll('button').forEach(b => b.disabled = !on); }
+    function begin() {
+      money = 0; time = 45; $('#money', el).textContent = '💰 $0'; $('#lmsg', el).textContent = '';
+      setEnabled(true); newCustomer();
+      iv = setInterval(() => {
+        time--; $('#ltime', el).textContent = '⏱ ' + time;
+        if (time <= 0) {
+          clearInterval(iv); setEnabled(false);
+          $('#lmsg', el).innerHTML = `Stand closed! You earned <b>$${money}</b>. <button class="btn" id="again">Open again</button>`;
+          $('#again', el).addEventListener('click', begin);
+        }
+      }, 1000);
+    }
+    el.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => { const k = b.dataset.add; if (cup[k] < 5) cup[k]++; drawCup(); }));
+    $('#dump', el).addEventListener('click', () => { cup = { l: 0, s: 0, i: 0 }; drawCup(); });
+    $('#serve', el).addEventListener('click', () => {
+      const ok = cup.l === order.l && cup.s === order.s && cup.i === order.i;
+      if (ok) { const tip = Math.floor(rand(1, 4)); money += 2 + tip; $('#lmsg', el).textContent = `😋 Perfect! +$${2 + tip}`; }
+      else { $('#lmsg', el).textContent = '😖 Blech! That\'s not what I ordered!'; }
+      $('#money', el).textContent = '💰 $' + money; newCustomer();
+    });
+    begin();
+    return () => clearInterval(iv);
+  }},
+
+  /* 🖍️ Crayon Museum */
+  crayon: { title: '🖍️ Museum of Crayons: Draw a Masterpiece', start(el) {
+    const colors = [['Tulip Red', '#e8364f'], ['Pie Crust', '#d9a35b'], ['Lemon', '#ffd92e'], ['Frog', '#3fb54a'], ['Sky', '#3aa0f0'], ['Grape', '#7d4bc2'], ['Bubblegum', '#ff7fc4'], ['Midnight', '#22223a'], ['Cloud', '#ffffff']];
+    el.innerHTML = `<p class="hint">Pick a crayon and draw. When it's done, hang it in the museum!</p>
+      <canvas class="game" width="480" height="300" style="background:#fff;cursor:crosshair"></canvas>
+      <div class="swatches">${colors.map(([n, c], i) => `<div class="swatch${i === 0 ? ' on' : ''}" title="${n}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>
+      <div class="row"><label>Size <input type="range" id="size" min="2" max="30" value="8"></label>
+        <button class="btn" id="clear">🧽 Clear</button><button class="btn" id="hang">🖼️ Hang it in the museum</button></div>
+      <div class="gallery" id="gallery"></div>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 480, 300);
+    let color = colors[0][1], drawing = false, lastP;
+    el.querySelectorAll('.swatch').forEach(s => s.addEventListener('click', () => {
+      el.querySelectorAll('.swatch').forEach(x => x.classList.remove('on')); s.classList.add('on'); color = s.dataset.c;
+    }));
+    function line(a, b) {
+      ctx.strokeStyle = color; ctx.lineWidth = +$('#size', el).value; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    c.addEventListener('pointerdown', e => { drawing = true; c.setPointerCapture(e.pointerId); lastP = canvasPos(c, e); line(lastP, { x: lastP.x + .1, y: lastP.y }); });
+    c.addEventListener('pointermove', e => { if (!drawing) return; const p = canvasPos(c, e); line(lastP, p); lastP = p; });
+    c.addEventListener('pointerup', () => drawing = false);
+    c.addEventListener('pointercancel', () => drawing = false);
+    $('#clear', el).addEventListener('click', () => { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 480, 300); });
+    const renderGallery = () => { $('#gallery', el).innerHTML = galleryImgs.map(src => `<img src="${src}" alt="drawing">`).join(''); };
+    $('#hang', el).addEventListener('click', () => { galleryImgs.unshift(c.toDataURL()); if (galleryImgs.length > 8) galleryImgs.pop(); renderGallery(); });
+    renderGallery();
+  }},
+
+  /* 🎩 Hat Match */
+  hats: { title: '🎩 Hats Hats Hats: Hat Rush', start(el) {
+    const hats = [['🎩', 'top hat'], ['👒', 'sun hat'], ['🧢', 'baseball cap'], ['🎓', 'graduation cap'], ['⛑️', 'rescue helmet'], ['👑', 'crown'], ['🪖', 'army helmet'], ['🤠', 'cowboy hat'], ['🧑‍🍳', 'chef hat'], ['🥳', 'party hat']];
+    const shoppers = ['🦒', '🐸', '🐙', '🦔', '🐻', '🦄', '🐢', '🦉'];
+    el.innerHTML = `<p class="hint">Customers are in a hurry! Click the hat they ask for. 30 seconds. Go!</p>
+      <div class="stats"><span id="hs">Hats sold: 0</span><span id="ht">⏱ 30</span></div>
+      <div class="wanted" id="want"></div><div class="hatgrid" id="grid"></div><p class="msg" id="hmsg"></p>`;
+    let score, time, iv, wanted, playing;
+    function round() {
+      wanted = pick(hats);
+      $('#want', el).innerHTML = `${pick(shoppers)} wants a <b>${wanted[1]}</b>!<span class="big-hat">${wanted[0]}</span>`;
+      const others = shuffle(hats.filter(h => h !== wanted)).slice(0, 5);
+      $('#grid', el).innerHTML = shuffle([wanted, ...others]).map(h => `<button data-h="${h[0]}" title="${h[1]}">${h[0]}</button>`).join('');
+    }
+    $('#grid', el).addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b || !playing) return;
+      if (b.dataset.h === wanted[0]) { score++; $('#hmsg', el).textContent = pick(['Snazzy!', 'Fabulous!', 'What a look!', 'Ooh la la!']); }
+      else { score = Math.max(0, score - 1); $('#hmsg', el).textContent = '🙅 Wrong hat!'; }
+      $('#hs', el).textContent = 'Hats sold: ' + score; round();
+    });
+    function begin() {
+      score = 0; time = 30; playing = true; $('#hs', el).textContent = 'Hats sold: 0'; $('#hmsg', el).textContent = ''; round();
+      iv = setInterval(() => {
+        time--; $('#ht', el).textContent = '⏱ ' + time;
+        if (time <= 0) {
+          clearInterval(iv); playing = false;
+          $('#hmsg', el).innerHTML = `Shop closed! You sold <b>${score}</b> hats. <button class="btn" id="hagain">Play again</button>`;
+          $('#hagain', el).addEventListener('click', begin);
+        }
+      }, 1000);
+    }
+    begin();
+    return () => clearInterval(iv);
+  }},
+
+  /* 🛋️ Couch Stacker */
+  couch: { title: '🛋️ Couch-Making Academy: Cushion Stacker', start(el) {
+    el.innerHTML = `<p class="hint">Final exam: build the TALLEST couch! Click (or Space) to drop each cushion. Overhanging bits get chopped off.</p>
+      <div class="stats"><span id="cs">Cushions: 0</span><span id="cb">Best: 0</span></div>
+      <canvas class="game" width="360" height="420"></canvas>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const H = 26, palette = ['#e8364f', '#ff9f43', '#ffd92e', '#3fb54a', '#3aa0f0', '#7d4bc2', '#ff7fc4'];
+    let stack, mover, over, raf, last, flash, best = 0;
+    function reset() {
+      stack = [{ x: 80, w: 200 }];
+      mover = { x: 0, w: 200, dir: 1, speed: 2.2 };
+      over = false; flash = ''; last = performance.now();
+      $('#cs', el).textContent = 'Cushions: 0';
+    }
+    function drop() {
+      if (over) { reset(); return; }
+      const top = stack[stack.length - 1];
+      if (Math.abs(mover.x - top.x) < 5) mover.x = top.x;
+      const l = Math.max(mover.x, top.x), r = Math.min(mover.x + mover.w, top.x + top.w), w = r - l;
+      if (w <= 0) { over = true; best = Math.max(best, stack.length - 1); $('#cb', el).textContent = 'Best: ' + best; return; }
+      flash = w === mover.w ? 'Perfect fluff! ✨' : '';
+      stack.push({ x: l, w });
+      $('#cs', el).textContent = 'Cushions: ' + (stack.length - 1);
+      const fromLeft = stack.length % 2 === 0;
+      mover = { x: fromLeft ? -w : 360, w, dir: fromLeft ? 1 : -1, speed: Math.min(mover.speed + .18, 7) };
+    }
+    c.addEventListener('pointerdown', drop);
+    const kh = e => { if (e.code === 'Space') { e.preventDefault(); drop(); } };
+    document.addEventListener('keydown', kh);
+    function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); ctx.fill(); }
+    function loop(t) {
+      const dt = Math.min((t - last) / 16.67, 3); last = t;
+      if (!over) {
+        mover.x += mover.dir * mover.speed * dt;
+        if (mover.x + mover.w > 360 + 40 && mover.dir > 0) mover.dir = -1;
+        if (mover.x < -40 && mover.dir < 0) mover.dir = 1;
+      }
+      ctx.fillStyle = '#fdf0dc'; ctx.fillRect(0, 0, 360, 420);
+      ctx.fillStyle = '#e9d3b4'; for (let i = 0; i < 360; i += 40) ctx.fillRect(i, 0, 2, 420);
+      const baseY = 380, cam = Math.max(0, stack.length - 11) * H;
+      // couch frame & legs
+      ctx.fillStyle = '#6b3f1f';
+      ctx.fillRect(90, baseY + H + cam, 12, 18); ctx.fillRect(258, baseY + H + cam, 12, 18);
+      stack.forEach((s, i) => {
+        const y = baseY - i * H + cam;
+        ctx.fillStyle = i === 0 ? '#8a4f28' : palette[i % palette.length];
+        rr(s.x, y, s.w, H - 3, 8);
+        if (i > 0) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(s.x + 6, y + 4, Math.max(0, s.w - 12), 4); }
+      });
+      if (!over) {
+        const y = baseY - stack.length * H + cam;
+        ctx.fillStyle = palette[stack.length % palette.length];
+        rr(mover.x, y, mover.w, H - 3, 8);
+      }
+      ctx.fillStyle = '#2b1d3a'; ctx.textAlign = 'center'; ctx.font = 'bold 18px Trebuchet MS';
+      if (flash && !over) ctx.fillText(flash, 180, 30);
+      if (over) {
+        ctx.fillStyle = 'rgba(43,29,58,.8)'; ctx.fillRect(0, 150, 360, 110);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 22px Trebuchet MS';
+        ctx.fillText(`🎓 Graduated with ${stack.length - 1} cushions!`, 180, 195);
+        ctx.font = '16px Trebuchet MS'; ctx.fillText('Click to build another couch', 180, 228);
+      }
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kh); };
+  }},
+
+  /* 🧦 Lost Sock Memory */
+  socks: { title: '🧦 Lost Sock Office: Match the Pairs', start(el) {
+    const things = ['🧦', '🧤', '🧣', '🩴', '👟', '🕶️', '🥾', '🩳'];
+    el.innerHTML = `<p class="hint">Everything here lost its partner! Flip two at a time to reunite the pairs.</p>
+      <div class="stats"><span id="mv">Flips: 0</span><span id="pr">Pairs: 0/8</span></div>
+      <div class="memgrid" id="mg"></div><p class="msg" id="mmsg"></p>`;
+    let first, lock, moves, pairs, to;
+    function begin() {
+      first = null; lock = false; moves = 0; pairs = 0;
+      $('#mv', el).textContent = 'Flips: 0'; $('#pr', el).textContent = 'Pairs: 0/8'; $('#mmsg', el).textContent = '';
+      $('#mg', el).innerHTML = shuffle([...things, ...things]).map(t => `<button class="card" data-t="${t}"></button>`).join('');
+    }
+    $('#mg', el).addEventListener('click', e => {
+      const card = e.target.closest('.card');
+      if (!card || lock || card.classList.contains('up') || card.classList.contains('done')) return;
+      card.classList.add('up'); card.textContent = card.dataset.t;
+      if (!first) { first = card; return; }
+      moves++; $('#mv', el).textContent = 'Flips: ' + moves;
+      if (first.dataset.t === card.dataset.t) {
+        first.classList.add('done'); card.classList.add('done'); first = null; pairs++;
+        $('#pr', el).textContent = `Pairs: ${pairs}/8`;
+        if (pairs === 8) { $('#mmsg', el).innerHTML = `🎉 All reunited in ${moves} flips! <button class="btn" id="magain">Play again</button>`; $('#magain', el).addEventListener('click', begin); }
+      } else {
+        lock = true; const a = first; first = null;
+        to = setTimeout(() => { [a, card].forEach(x => { x.classList.remove('up'); x.textContent = ''; }); lock = false; }, 750);
+      }
+    });
+    begin();
+    return () => clearTimeout(to);
+  }},
+
+  /* 🥧 Pie Bakery Clicker */
+  bakery: { title: '🥧 Tulip PIE Bakery: Pie Tycoon', start(el) {
+    if (!games.bakery.state) games.bakery.state = { pies: 0, owned: [0, 0, 0, 0] };
+    const st = games.bakery.state;
+    const helpers = [['👵 Grandma Baker', 15, 1], ['🐿️ Squirrel Assistant', 60, 4], ['🤖 Pie-O-Tron 3000', 250, 15], ['🌷 Magic Tulip Oven', 1000, 60]];
+    el.innerHTML = `<p class="hint">Click the pie to bake! Hire helpers to bake for you. (Your bakery keeps going while you play other games.)</p>
+      <div class="stats"><span id="pies">🥧 0 pies</span><span id="pps">0 per second</span></div>
+      <button class="pie-btn" id="pie" aria-label="Bake a pie">🥧</button>
+      <div class="shop" id="shop"></div>`;
+    const cost = i => Math.ceil(helpers[i][1] * Math.pow(1.15, st.owned[i]));
+    const pps = () => st.owned.reduce((s, n, i) => s + n * helpers[i][2], 0);
+    function render() {
+      $('#pies', el).textContent = `🥧 ${Math.floor(st.pies)} pies`;
+      $('#pps', el).textContent = `${pps()} per second`;
+      $('#shop', el).innerHTML = helpers.map((h, i) => `<button class="btn" data-i="${i}" ${st.pies < cost(i) ? 'disabled' : ''}>${h[0]}: costs ${cost(i)} 🥧 (+${h[2]}/s), you have ${st.owned[i]}</button>`).join('');
+    }
+    $('#pie', el).addEventListener('click', () => { st.pies++; render(); });
+    $('#shop', el).addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const i = +b.dataset.i; if (st.pies >= cost(i)) { st.pies -= cost(i); st.owned[i]++; render(); }
+    });
+    if (!games.bakery.ticker) games.bakery.ticker = setInterval(() => { st.pies += pps() / 10; games.bakery.onTick && games.bakery.onTick(); }, 100);
+    games.bakery.onTick = render;
+    render();
+    return () => { games.bakery.onTick = null; };
+  }},
+};
+
+/* ---------------- town ---------------- */
+const buildings = [
+  { key: 'stable',   emoji: '🐴', name: 'Hoofbeat Stables',     tag: 'Pony Derby',         roof: '#8a4f28', wall: '#e2b07a' },
+  { key: 'rink',     emoji: '⛸️', name: 'Frosty Loop Rink',     tag: 'Snowflake Catch',    roof: '#3aa0f0', wall: '#d6f0ff' },
+  { key: 'lemonade', emoji: '🍋', name: "Lulu's Lemonade",      tag: 'Lemonade Rush',      roof: '#ff9f43', wall: '#fff3a0' },
+  { key: 'crayon',   emoji: '🖍️', name: 'Museum of Crayons',    tag: 'Draw a Masterpiece', roof: '#7d4bc2', wall: '#f1e4ff' },
+  { key: 'hats',     emoji: '🎩', name: 'Hats Hats Hats',       tag: 'Hat Rush',           roof: '#22223a', wall: '#ffd1dc' },
+  { key: 'couch',    emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker',    roof: '#3fb54a', wall: '#e5f7d9' },
+  { key: 'socks',    emoji: '🧦', name: 'Lost Sock Office',     tag: 'Match the Pairs',    roof: '#e8364f', wall: '#fde6e9' },
+  { key: 'bakery',   emoji: '🥧', name: 'Tulip PIE Bakery',     tag: 'Pie Tycoon',         roof: '#d9a35b', wall: '#fff0d6' },
+];
+$('#town').innerHTML = buildings.map(b => `
+  <button class="building" data-key="${b.key}">
+    <div class="roof" style="background:${b.roof}"></div>
+    <div class="walls" style="background:${b.wall}">
+      <span class="emoji">${b.emoji}</span>
+      <span class="sign">${b.name}</span>
+      <span class="tagline">🎮 ${b.tag}</span>
+    </div>
+  </button>`).join('');
+
+let cleanup = null;
+function openGame(key) {
+  closeGame();
+  const g = games[key];
+  $('#mtitle').textContent = g.title;
+  $('#modal').classList.remove('hidden');
+  cleanup = g.start($('#game')) || null;
+}
+function closeGame() {
+  if (cleanup) cleanup();
+  cleanup = null;
+  $('#game').innerHTML = '';
+  $('#modal').classList.add('hidden');
+}
+$('#town').addEventListener('click', e => { const b = e.target.closest('.building'); if (b) openGame(b.dataset.key); });
+$('#close').addEventListener('click', closeGame);
+$('#modal').addEventListener('pointerdown', e => { if (e.target.id === 'modal') closeGame(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGame(); });
+</script>
 </body>
 </html>
