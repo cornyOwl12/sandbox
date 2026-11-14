@@ -1139,15 +1139,15 @@ const games = {
     ];
     const Z = (name, e, x, y, b, lines, still) => ({ name, e, x, y, hx: x, hy: y, b, lines, li: 0, still, tx: x, ty: y, wait: rand(0, 2), near: false });
     const zs = [
-      Z('Couch Kevin', '🧟‍♂️', 120, 380, [40, 300, 220, 140], ["This show is so good. I'm dead serious.", "I haven't left this couch in 40 years. Livin' the dream.", 'Wanna watch? It\'s a cooking show. Mostly about brains. KIDDING.']),
-      Z('Greeter Greg', '🧟', 400, 330, [300, 260, 200, 180], ['Welcome to Chill Zombie Manor! Shoes on, nobody cares.', "Granny's room is top right. Don't wake her.", 'Want a hug? No? Fair. I\'m a bit squishy.']),
-      Z('Chef Moldy', '🧟‍♀️', 700, 320, [560, 270, 200, 170], ['Brain-free pancakes, coming right up!', "Taste this. Too salty? I can't taste anything.", "Don't mind the smell. That's just me."]),
-      Z('Bookworm Bea', '🧟‍♀️', 120, 140, [40, 80, 180, 140], ['This romance is 1,223 pages long. A zombie falls for a VAMPIRE?! Scandalous.', 'My library card number is 1223. It expired in 1223. Nobody\'s checked.', 'Granny locked her door again. She uses her birthday for EVERYTHING. December 23rd. 12/23. Don\'t tell her I told you. 🤫']),
-      Z('Bubbles', '🧟', 300, 72, [300, 72, 0, 0], ['DO YOU MIND?!', 'Me and Rubber Ducky are having a moment. 🦆', "I'm just soaking. And slightly dissolving."], true),
-      Z('DJ Rotten', '🧟‍♂️', 470, 140, [380, 90, 180, 130], ["This next song is called 'Grave Vibes'! 🎸", 'I only know one chord. The deadliest one.', 'Rock and roll never dies. Neither do I!']),
+      Z('Couch Kevin', '🧟‍♂️', 120, 380, [40, 300, 220, 140], ["This show is so good. I'm dead serious.", "I've watched 1,223 episodes of this show in a row. Livin' the dream.", 'Wanna watch? It\'s a cooking show. Mostly about brains. KIDDING.']),
+      Z('Greeter Greg', '🧟', 400, 330, [300, 260, 200, 180], ['Welcome to Chill Zombie Manor! You\'re visitor number 1,223 today. Shoes on, nobody cares.', "Granny's room is top right. Don't wake her.", 'Want a hug? No? Fair. I\'m a bit squishy.']),
+      Z('Chef Moldy', '🧟‍♀️', 700, 320, [560, 270, 200, 170], ['Brain-free pancakes, coming right up! I flip exactly 1,223 a day.', "Taste this. Too salty? I can't taste anything.", "Don't mind the smell. That's just me."]),
+      Z('Bookworm Bea', '🧟‍♀️', 120, 140, [40, 80, 180, 140], ["Shh... I'm at the good part.", 'This one\'s a romance. A zombie falls for a VAMPIRE?! Scandalous.', 'My library card expired in 1223. Nobody\'s checked.']),
+      Z('Bubbles', '🧟', 300, 72, [300, 72, 0, 0], ['DO YOU MIND?!', 'Me and Rubber Ducky are having a moment. 🦆', "I've been in this tub for 1,223 days. Slightly dissolving."], true),
+      Z('DJ Rotten', '🧟‍♂️', 470, 140, [380, 90, 180, 130], ["This next song is track 1223 off my album, 'Grave Vibes'! 🎸", 'I only know one chord. The deadliest one.', 'Rock and roll never dies. Neither do I!']),
     ];
     const granny = { name: 'Granny Grumbles', x: 700, y: 118, home: [700, 118], b: [595, 35, 170, 190], state: 'sit', li: 0 };
-    const grannyIdle = ['Who\'s tracking mud in my room?!', 'In MY day we shambled uphill both ways!', 'Turn that racket DOWN, DJ!', "Don't you DARE touch my yarn.", 'Kids these days. No respect for the undead.'];
+    const grannyIdle = ['Who\'s tracking mud in my room?!', 'In MY day we shambled uphill both ways!', 'Turn that racket DOWN, DJ!', "Don't you DARE touch my yarn.", 'I\'ve told you kids 1,223 times. Stay OUT of my room!'];
     const grannyChase = ['COME HERE, YOU WHIPPERSNAPPER!', "I'll rattle my cane at you!", 'GET OUT OF MY ROOM!'];
     const player = { x: 400, y: 430 };
     let target = null, shoos = 0, keys = {}, raf, last = performance.now(), say = null, sayT = 0, msgT = 0;
