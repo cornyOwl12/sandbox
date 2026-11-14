@@ -12,7 +12,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🛋️ Couch-Making Academy | Cushion Stacker: build the tallest couch |
 | 🧦 Lost Sock Office | Memory match: reunite the pairs |
 | 💅 Glitter Claws Nails | Polish Panic: paint nails to match each customer |
-| 🪙 The Penny House | Penny Press: stamp pennies with perfect timing |
+| 🪙 The Penny House | Penny Press: stamp pennies with perfect timing. Every penny = 1 casino coin |
 | ⛰️ Mount Wobblemore | Trike Climb: a Getting-Over-It-style climb… on a tricycle (A/D pedal, Space jumps, drag to fling) |
 | 🔴 Checkers Club | Checkers Match vs. Professor Hoot 🦉 |
 | 🦆 Duck Pond | Feed the Ducks before Gerald the goose steals the bread |
@@ -22,6 +22,6 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🦷 Dentist | Tooth Trouble: pull junk out of teeth, drill cavities, scrub plaque |
 | 🥄 Spoon Orchard | Spoon Harvest: pick ripe spoons, grab golden ones, avoid the forks |
 | 🏦 Secret bank | Find the hidden 🧱 in Penny Press, bring Granny's 💣, blow the vault, get ∞ casino coins |
-| 🎰 Lucky Clover Casino | Locked until you find the key. Spend race coins on skin slots, then pick a skin in the wardrobe |
+| 🎰 Lucky Clover Casino | Locked until you find the key. Spend coins (from pennies you stamp at The Penny House) on skin slots, then pick a skin in the wardrobe |
 
 Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.

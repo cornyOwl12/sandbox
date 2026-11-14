@@ -466,8 +466,7 @@ const games = {
       const w = pos.findIndex(p => p >= 100);
       if (w < 0) return;
       state = 'done'; clearInterval(iv);
-      if (w === 0) { save.coins++; persist(); }
-      msg.textContent = w === 0 ? `🏆 Sir Neighs-a-Lot wins! +1 🪙 coin (you have ${save.coins}). Spend it at the casino!` : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
+      msg.textContent = w === 0 ? '🏆 Sir Neighs-a-Lot wins! You are a champion jockey!' : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
       btn.textContent = 'Race again';
     }
     function gallop() { if (state === 'run') { pos[0] += 2.1; check(); draw(); } else if (state === 'done') countdown(); }
@@ -940,13 +939,15 @@ const games = {
   }},
   /* 🪙 Penny Press */
   penny: { title: '🪙 The Penny House: Penny Press', start(el) {
-    el.innerHTML = `<p class="hint">Copper blanks roll down the belt. Click (or Space) to stamp when a blank is right under the press! A perfect stamp makes a shiny penny.</p>
+    el.innerHTML = `<p class="hint">Copper blanks roll down the belt. Click (or Space) to stamp when a blank is right under the press! A perfect stamp makes a shiny penny. <b>Every penny you make = 1 🪙 coin</b> to spend at the casino!</p>
       <div class="stats"><span id="pc">🪙 0¢</span><span id="pl">Blanks left: 25</span></div>
       <div class="secret-wrap"><canvas class="game" width="480" height="260"></canvas><button class="secret-btn" id="secret" title="hmm, a loose brick?">🧱</button></div><p class="msg" id="pmsg"></p>`;
     $('#secret', el).addEventListener('click', e => { e.stopPropagation(); openGame('bank'); });
     const c = $('canvas', el), ctx = c.getContext('2d'), PX = 240, BELT = 200;
     let blanks, made, left, spawnT, speed, press, raf, last, over, pops;
     function reset() { blanks = []; made = 0; left = 25; spawnT = 0; speed = 110; press = 0; over = false; pops = []; last = performance.now(); $('#pmsg', el).textContent = ''; }
+    // every penny you make is yours to keep (and spend at the casino)
+    function earn() { if (!save.unlimited) { save.coins++; persist(); } }
     function stamp() {
       if (over) { reset(); return; }
       if (press > 0) return;
@@ -954,8 +955,8 @@ const games = {
       const b = blanks.filter(b => !b.done).sort((a, b) => Math.abs(a.x - PX) - Math.abs(b.x - PX))[0];
       if (!b) return;
       const d = Math.abs(b.x - PX);
-      if (d < 10) { b.done = 'shiny'; made += 1; pops.push({ x: PX, y: BELT - 60, t: 1, txt: '✨ Perfect!' }); }
-      else if (d < 26) { b.done = 'wonky'; made += 1; pops.push({ x: PX, y: BELT - 60, t: 1, txt: 'Wonky penny' }); }
+      if (d < 10) { b.done = 'shiny'; made += 1; earn(); pops.push({ x: PX, y: BELT - 60, t: 1, txt: '✨ Perfect! +1 🪙' }); }
+      else if (d < 26) { b.done = 'wonky'; made += 1; earn(); pops.push({ x: PX, y: BELT - 60, t: 1, txt: 'Wonky penny +1 🪙' }); }
     }
     c.addEventListener('pointerdown', stamp);
     const kh = e => { if (e.code === 'Space') { e.preventDefault(); stamp(); } };
@@ -1469,7 +1470,7 @@ const games = {
     }
     const weights = { common: 60, rare: 30, legendary: 10 };
     const filler = ['🍒', '🔔', '🍋', '⭐', '💎', '7️⃣'];
-    el.innerHTML = `<p class="hint">Each spin costs <b>1 🪙 coin</b>. Win coins by winning races at Hoofbeat Stables. Line up 3 of a kind to win a new character skin!</p>
+    el.innerHTML = `<p class="hint">Each spin costs <b>1 🪙 coin</b>. Earn coins by stamping pennies at The Penny House: every penny you make is yours. Line up 3 of a kind to win a new character skin!</p>
       <div class="stats"><span id="scoins">🪙 ${save.coins} coins</span><span id="sowned"></span></div>
       <div class="slot"><div class="reels"><div class="reel" id="r0">🍀</div><div class="reel" id="r1">🎰</div><div class="reel" id="r2">🍀</div></div>
         <button class="btn big" id="spin">SPIN (1 🪙)</button></div>
@@ -1528,7 +1529,7 @@ const games = {
             for (let k = 0; k < 4; k++) setTimeout(() => launch(rect.left + rand(0, rect.width), rect.top + rand(-40, 40)), k * 180);
           }
         } else if (outcome === 'refund') { save.coins++; $('#smsg', el).textContent = 'Two of a kind! You get your coin back. 🪙'; }
-        else $('#smsg', el).textContent = pick(['No luck. The house always wins. 🍀', 'So close! (Not really.)', 'Nothing! Go win more races.']);
+        else $('#smsg', el).textContent = pick(['No luck. The house always wins. 🍀', 'So close! (Not really.)', 'Nothing! Go stamp more pennies.']);
         persist(); renderWard();
       }
     });
