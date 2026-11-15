@@ -275,6 +275,7 @@
   .kp-msg { margin-top: 8px; font-size: 13px; min-height: 1.2em; }
   .kp-x { position: absolute; top: 6px; right: 6px; background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; }
   .dtool.on { background: #8fd3ff; box-shadow: 0 3px 0 var(--ink), inset 0 0 0 2px #1f5fbf; }
+  .stadium { background: repeating-linear-gradient(90deg, #3f9a45 0 18px, #47a84d 18px 36px); border-color: #fff; }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -2139,6 +2140,150 @@ const games = {
     reset(); raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }},
+  /* 🏈 Teacup Stadium */
+  teacup: { title: '🏈 Teacup Stadium: Tea-Down Toss', start(el) {
+    el.innerHTML = `<p class="hint">Land the football in the giant teacup! <b>Click and drag backward</b> (like a slingshot) to aim and set power, then let go to throw. Watch the 💨 wind! 10 throws. Farther cups = more points.</p>
+      <div class="stats"><span id="tcs">🏈 Score: 0</span><span id="tcr">Throw 1/10</span><span id="tcb"></span></div>
+      <canvas class="game" width="720" height="320" style="cursor:grab;touch-action:none"></canvas>
+      <p class="msg" id="tcm"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const BX = 70, BY = 262, GROUND = 292, R = 9, G = 760;
+    let ball, cup, wind, score, round, streak, state, aim, raf, last, splash, pops, msgT, crowd;
+    function newCup() {
+      cup = { x: rand(330, 640), base: GROUND - 6, w: 92, h: 92, move: round >= 6 ? rand(30, 70) : 0, ph: rand(0, 6), x0: 0 };
+      cup.x0 = cup.x;
+      wind = round >= 3 ? Math.round(rand(-3, 3)) : 0;
+    }
+    function resetBall() { ball = { x: BX, y: BY, vx: 0, vy: 0, rot: 0, flying: false, done: false }; }
+    function reset() {
+      score = 0; round = 1; streak = 0; state = 'aim'; splash = []; pops = []; crowd = 0;
+      newCup(); resetBall(); last = performance.now(); $('#tcm', el).textContent = 'Drag back from anywhere and let go!';
+      $('#tcb', el).textContent = save.teacupBest ? `🏆 Best: ${save.teacupBest}` : '🏆 Best: none yet';
+    }
+    c.addEventListener('pointerdown', e => {
+      if (state === 'over') { reset(); return; }
+      if (state !== 'aim') return;
+      aim = { a: canvasPos(c, e), b: canvasPos(c, e) }; c.setPointerCapture(e.pointerId); c.style.cursor = 'grabbing';
+    });
+    c.addEventListener('pointermove', e => { if (aim) aim.b = canvasPos(c, e); });
+    const release = () => {
+      if (!aim) return;
+      const dx = aim.a.x - aim.b.x, dy = aim.a.y - aim.b.y, len = Math.hypot(dx, dy);
+      aim = null; c.style.cursor = 'grab';
+      if (len < 10 || state !== 'aim') return;
+      const pow = Math.min(len, 200) / 200 * 820;
+      ball.vx = dx / len * pow; ball.vy = dy / len * pow; ball.flying = true; state = 'fly'; playNote(64, .2);
+    };
+    c.addEventListener('pointerup', release); c.addEventListener('pointercancel', release);
+    function finishThrow(made) {
+      state = 'wait'; msgT = 1.4;
+      if (made) {
+        streak++;
+        const dist = cup.x - BX, pts = 1 + Math.floor(dist / 140) + (cup.move ? 1 : 0) + (wind ? Math.abs(wind) > 1 ? 1 : 0 : 0);
+        const total = pts * (streak >= 3 ? 2 : 1);
+        score += total; crowd = 1.5;
+        for (let i = 0; i < 26; i++) splash.push({ x: ball.x, y: cup.base - cup.h + 4, vx: rand(-120, 120), vy: rand(-320, -120), t: rand(.6, 1.1) });
+        playNote(79, .3); playNote(84, .5);
+        $('#tcm', el).textContent = `${pick(['☕ SPLASH! Tea-down!', '🫖 Right in the cup!', '☕ Steeped to perfection!', '🏈 TOUCHDOWN... er, TEA-DOWN!'])} +${total}${streak >= 3 ? ' (🔥 streak x2!)' : ''}`;
+      } else {
+        streak = 0; playNote(45, .4);
+        $('#tcm', el).textContent = pick(['Missed! The tea remains un-footballed.', 'Clank! So close.', 'Nope! The crowd sips sadly.', 'Wide! Try a different angle.']);
+      }
+    }
+    function nextRound() {
+      round++;
+      if (round > 10) {
+        state = 'over';
+        const best = !save.teacupBest || score > save.teacupBest;
+        if (best) { save.teacupBest = score; persist(); }
+        $('#tcm', el).textContent = `🏁 Game over! Final score: ${score}.${best ? ' 🎉 NEW BEST!' : ''} Click the field to play again.`;
+        $('#tcb', el).textContent = `🏆 Best: ${save.teacupBest}`;
+        if (best && score > 0) { const r = c.getBoundingClientRect(); for (let k = 0; k < 4; k++) setTimeout(() => launch(r.left + rand(0, r.width), r.top + rand(0, 80)), k * 160); }
+        return;
+      }
+      newCup(); resetBall(); state = 'aim';
+      $('#tcm', el).textContent = round === 3 ? '💨 The wind is picking up…' : round === 6 ? '😱 Uh oh, the teacup is sliding around now!' : '';
+    }
+    function bounceOffPoint(px, py, rest) {
+      const dx = ball.x - px, dy = ball.y - py, d = Math.hypot(dx, dy);
+      if (d < R && d > .01) {
+        const nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+        if (vn < 0) { ball.vx -= (1 + rest) * vn * nx; ball.vy -= (1 + rest) * vn * ny; playNote(88, .08); }
+        ball.x = px + nx * R; ball.y = py + ny * R;
+      }
+    }
+    function bounceOffSeg(ax, ay, bx, by, rest) {
+      const vx = bx - ax, vy = by - ay; let tt = ((ball.x - ax) * vx + (ball.y - ay) * vy) / (vx * vx + vy * vy); tt = Math.max(0, Math.min(1, tt));
+      bounceOffPoint(ax + vx * tt, ay + vy * tt, rest);
+    }
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .033); last = t;
+      if (cup.move && state !== 'over') cup.x = cup.x0 + Math.sin(t / 700 + cup.ph) * cup.move;
+      const L = cup.x - cup.w / 2, Rr = cup.x + cup.w / 2, top = cup.base - cup.h, bl = cup.x - cup.w * .32, br = cup.x + cup.w * .32;
+      if (state === 'fly') {
+        const steps = 3;
+        for (let s = 0; s < steps && state === 'fly'; s++) {
+          const h = dt / steps, py = ball.y;
+          ball.vx += wind * 55 * h; ball.vy += G * h; ball.x += ball.vx * h; ball.y += ball.vy * h; ball.rot += ball.vx * h / 12;
+          // into the cup?
+          if (py < top + 4 && ball.y >= top + 4 && ball.x > L + 6 && ball.x < Rr - 6 && ball.vy > 0) { ball.done = true; finishThrow(true); break; }
+          bounceOffPoint(L, top, .45); bounceOffPoint(Rr, top, .45);
+          bounceOffSeg(L, top, bl, cup.base, .35); bounceOffSeg(Rr, top, br, cup.base, .35);
+          if (ball.y > GROUND - R) { ball.y = GROUND - R; ball.vy *= -.35; ball.vx *= .6; if (Math.abs(ball.vy) < 40 && Math.abs(ball.vx) < 25) { finishThrow(false); break; } }
+          if (ball.x > 760 || ball.x < -40) { finishThrow(false); break; }
+        }
+      } else if (state === 'wait') { msgT -= dt; if (msgT <= 0) nextRound(); }
+      crowd = Math.max(0, crowd - dt);
+      // ---- draw ----
+      const sky = ctx.createLinearGradient(0, 0, 0, 320); sky.addColorStop(0, '#2c4a8a'); sky.addColorStop(1, '#8fc0ff');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, 720, 320);
+      // stadium lights + stands
+      [[60, 30], [660, 30]].forEach(([x, y]) => { ctx.fillStyle = '#666'; ctx.fillRect(x - 3, y, 6, 120); ctx.fillStyle = '#fff9c4'; ctx.fillRect(x - 22, y - 12, 44, 16); ctx.fillStyle = 'rgba(255,250,200,.12)'; ctx.beginPath(); ctx.moveTo(x - 22, y); ctx.lineTo(x + (x < 360 ? 220 : -220), 300); ctx.lineTo(x + (x < 360 ? 60 : -60), 300); ctx.fill(); });
+      ctx.fillStyle = '#5a4a7a'; ctx.fillRect(0, 150, 720, 50);
+      ctx.font = '15px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
+      const fans = ['😃', '🦆', '🐼', '👵', '🧟', '🤠', '🐸', '😄', '🦄'];
+      for (let i = 0; i < 30; i++) for (let row = 0; row < 2; row++) ctx.fillText(fans[(i * 3 + row) % fans.length], 12 + i * 24 + row * 12, 164 + row * 20 - (crowd > 0 && Math.sin(t / 80 + i) > 0 ? 6 : 0));
+      // field
+      ctx.fillStyle = '#3f9a45'; ctx.fillRect(0, 200, 720, 120);
+      for (let i = 0; i < 12; i++) { ctx.fillStyle = i % 2 ? '#47a84d' : '#3f9a45'; ctx.fillRect(i * 60, 200, 60, 120); }
+      ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 2; for (let i = 1; i < 12; i++) { ctx.beginPath(); ctx.moveTo(i * 60, 200); ctx.lineTo(i * 60, 320); ctx.stroke(); }
+      // wind sock
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Trebuchet MS'; ctx.fillText(wind ? `💨 Wind: ${wind < 0 ? '← '.repeat(-wind) : '→ '.repeat(wind)}` : '💨 Wind: calm', 600, 120);
+      // teacup: saucer, cup, handle, tea
+      ctx.fillStyle = '#f6f0ff'; ctx.beginPath(); ctx.ellipse(cup.x, cup.base + 2, cup.w * .75, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#c9a0dc'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = '#ff9fc8'; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(Rr - 4, top + 34, 20, -Math.PI / 2.2, Math.PI / 2.2); ctx.stroke();
+      ctx.fillStyle = '#ffc4dd'; ctx.beginPath(); ctx.moveTo(L, top); ctx.lineTo(Rr, top); ctx.lineTo(br, cup.base); ctx.quadraticCurveTo(cup.x, cup.base + 8, bl, cup.base); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff7fae'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(cup.x - 30 + i * 15, top + 40 + (i % 2) * 14, 4, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#ffd84a'; ctx.fillRect(L + 6, top + 6, cup.w - 12, 4);
+      ctx.fillStyle = '#a0522d'; ctx.beginPath(); ctx.ellipse(cup.x, top + 3, cup.w / 2 - 3, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(cup.x, top, cup.w / 2, 8, 0, 0, Math.PI * 2); ctx.stroke();
+      if (round < 3 || true) { ctx.globalAlpha = .5 + Math.sin(t / 300) * .2; ctx.fillStyle = '#fff'; ctx.font = '18px serif'; ctx.fillText('〰', cup.x - 10, top - 18 - Math.sin(t / 400) * 4); ctx.fillText('〰', cup.x + 12, top - 28 - Math.cos(t / 450) * 4); ctx.globalAlpha = 1; }
+      // splash
+      splash.forEach(p => { p.t -= dt; p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.fillStyle = '#c47a3a'; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; });
+      splash = splash.filter(p => p.t > 0);
+      // thrower
+      ctx.fillStyle = '#000'; ctx.font = '40px serif'; ctx.fillText(save.skin, BX - 30, BY + 4);
+      // aim preview
+      if (aim) {
+        const dx = aim.a.x - aim.b.x, dy = aim.a.y - aim.b.y, len = Math.hypot(dx, dy);
+        if (len > 10) {
+          const pow = Math.min(len, 200) / 200 * 820; let vx = dx / len * pow, vy = dy / len * pow, x = BX, y = BY;
+          ctx.fillStyle = 'rgba(255,255,255,.9)';
+          for (let i = 0; i < 14; i++) { for (let k = 0; k < 3; k++) { vy += G * .012; x += vx * .012; y += vy * .012; } ctx.beginPath(); ctx.arc(x, y, 3 - i * .15, 0, Math.PI * 2); ctx.fill(); }
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Trebuchet MS'; ctx.fillText(`Power ${Math.round(Math.min(len, 200) / 2)}%`, BX + 10, BY - 40);
+        }
+      }
+      // ball
+      if (!ball.done) { ctx.save(); ctx.translate(ball.x, ball.y); ctx.rotate(ball.rot); ctx.font = '24px serif'; ctx.fillStyle = '#000'; ctx.fillText('🏈', 0, 0); ctx.restore(); }
+      else { ctx.font = '16px serif'; ctx.fillText('🏈', cup.x + 8, top - 2); }
+      ctx.textBaseline = 'alphabetic';
+      $('#tcs', el).textContent = `🏈 Score: ${score}`; $('#tcr', el).textContent = state === 'over' ? 'Done!' : `Throw ${Math.min(round, 10)}/10${streak >= 2 ? ` · 🔥 ${streak} in a row` : ''}`;
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }},
+
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
     el.innerHTML = `<p class="hint">Help the cheese 🧀 ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
@@ -2433,6 +2578,14 @@ add(`<div class="paddock orchard" data-key="orchard" style="left:282px;top:104px
   </div>`);
 })();
 
+// teacup stadium on the hill
+add(`<div class="paddock stadium" data-key="teacup" style="left:610px;top:132px;width:180px;height:73px">
+  <span class="sign" style="top:-16px">🏈 Teacup Stadium</span>
+  <span style="position:absolute;left:14px;top:22px;font-size:24px">🏈</span>
+  <span style="position:absolute;right:16px;top:14px;font-size:34px">☕</span>
+  <span class="play-tag" style="bottom:-12px">🎮 Tea-Down Toss</span>
+</div>`);
+
 // horse paddock (part of the stables)
 add(`<div class="paddock" data-key="stable" style="left:226px;top:240px;width:180px;height:146px">
   <span class="sign" style="top:-16px">🐎 Paddock</span>
@@ -2507,7 +2660,7 @@ function openGame(key) {
   closeGame(false);
   const g = games[key];
   $('#mtitle').textContent = g.title;
-  $('.panel').classList.toggle('wide', ['mountain', 'zombies', 'crayon', 'piano', 'stable'].includes(key));
+  $('.panel').classList.toggle('wide', ['mountain', 'zombies', 'crayon', 'piano', 'stable', 'teacup'].includes(key));
   $('#modal').classList.remove('hidden');
   cleanup = g.start($('#game')) || null;
   // the tiny piano zooms up from where it sits on the map

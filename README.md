@@ -20,6 +20,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🐼 Panda Gym | Bamboo Workout: a rhythm game with Coach Bao Bao |
 | 🎹 Tiny Piano | Out on the grass. Click it and it zooms up big: play, record (optionally with your voice 🎤), save and delete songs |
 | 🦷 Dentist | Tooth Trouble: pull junk out of teeth, drill cavities, scrub plaque |
+| 🏈 Teacup Stadium | Tea-Down Toss: slingshot a football into a giant teacup |
 | 🥄 Spoon Orchard | Spoon Harvest: pick ripe spoons, grab golden ones, avoid the forks |
 | 🏦 Secret bank | Find the hidden 🧱 in Penny Press, bring Granny's 💣, blow the vault, get ∞ casino coins |
 | 🎰 Lucky Clover Casino | Locked until you find the key. Spend coins (from pennies you stamp at The Penny House) on skin slots, then pick a skin in the wardrobe |
