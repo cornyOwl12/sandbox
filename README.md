@@ -14,7 +14,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 💅 Glitter Claws Nails | Polish Panic: paint nails to match each customer |
 | 🪙 The Penny House | Penny Press: stamp pennies with perfect timing. Every penny = 1 casino coin |
 | ⛰️ Mount Wobblemore | Trike Climb: a Getting-Over-It-style climb… on a tricycle (A/D pedal, Space jumps, drag to fling) |
-| 🔴 Checkers Club | Checkers Match vs. Professor Hoot 🦉 |
+| ❌⭕ Tic-Tac-Toe Club | Tic-Tac-Toe vs. Professor Hoot 🦉 (Easy or Hard) |
 | 🦆 Duck Pond | Feed the Ducks before Gerald the goose steals the bread |
 | 🧟 Chill Zombie Manor | Explore a house of chill zombies. Crack the lock on Granny's door, avoid Granny Grumbles 👵, find the key 🔑 and the bomb 💣 |
 | 🐼 Panda Gym | Bamboo Workout: a rhythm game with Coach Bao Bao |

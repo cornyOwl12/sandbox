@@ -169,12 +169,12 @@
   .mountain .sign { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); white-space: nowrap; background: var(--cream);
     border: 2px solid var(--ink); border-radius: 6px; padding: 2px 8px; font-weight: bold; font-size: 14px; }
   .mountain .trike { position: absolute; left: 26%; top: 52%; font-size: 26px; transform: rotate(-35deg); }
-  .board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(400px, 100%); aspect-ratio: 1; margin: 0 auto; border: 6px solid #6b3f1f; border-radius: 6px; }
-  .sq { border: none; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; }
-  .sq.light { background: #f3dfb7; cursor: default; } .sq.dark { background: #8a5a3b; }
-  .sq.sel { background: #e6b422; } .sq.target { background: #5fae55; box-shadow: inset 0 0 0 3px #fff8; }
-  .pc { width: 78%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -4px 0 rgba(0,0,0,.3), 0 2px 0 rgba(0,0,0,.35); }
-  .pc.r { background: radial-gradient(circle at 40% 35%, #ff6b6b, #c4182f); } .pc.b { background: radial-gradient(circle at 40% 35%, #555, #151515); }
+  .ttt { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 8px; width: min(330px, 100%); aspect-ratio: 1; margin: 0 auto; background: #2b1d3a; padding: 8px; border-radius: 14px; }
+  .tcell { border: none; border-radius: 10px; background: #fff8ec; font-size: clamp(32px, 9vw, 56px); line-height: 1; padding: 0; min-width: 0; min-height: 0; overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+  .tcell:not(:disabled):hover { background: #ffe9f0; }
+  .tcell:disabled { cursor: default; color: inherit; }
+  .tcell.tline { background: #ffe27a; animation: twinkle 1s ease-in-out infinite; }
+  .tlevel.on { background: #8fd3ff; }
   #hud { position: fixed; top: 10px; left: 10px; z-index: 40; display: flex; gap: 8px; pointer-events: none; }
   #hud button { pointer-events: auto; font: inherit; font-weight: bold; font-size: 13px; background: #ffd1d1; border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
   #hud button.confirm { background: #e8364f; color: #fff; }
@@ -1004,101 +1004,70 @@ const games = {
     return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kh); };
   }},
 
-  /* 🔴 Checkers Club */
-  checkers: { title: '🔴 Checkers Club: Checkers Match', start(el) {
-    if (!games.checkers.score) games.checkers.score = { you: 0, hoot: 0 };
-    const score = games.checkers.score;
-    el.innerHTML = `<p class="hint">You are <b>🔴 red</b> against <b>Professor Hoot 🦉</b>. Click a piece, then click where it goes. Jumps are mandatory, and you can chain double jumps. Reach the far side to get a 👑 king!</p>
-      <div class="stats"><span id="cturn">Your turn</span><span id="cscore"></span></div>
-      <div class="board" id="board"></div>
-      <div class="row"><button class="btn" id="cnew">🔄 New game</button></div><p class="msg" id="cmsg"></p>`;
-    const boardEl = $('#board', el);
-    let B, turn, sel, chain, over, to;
-    const inside = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
-    function newGame() {
-      B = [...Array(8)].map((_, r) => [...Array(8)].map((_, c) => (r + c) % 2 === 1 ? (r < 3 ? { c: 'b', k: false } : r > 4 ? { c: 'r', k: false } : null) : null));
-      turn = 'r'; sel = null; chain = null; over = false; clearTimeout(to);
-      $('#cmsg', el).textContent = ''; render();
+  /* ❌⭕ Tic-Tac-Toe Club */
+  ttt: { title: '❌⭕ Tic-Tac-Toe Club', start(el) {
+    if (!games.ttt.score) games.ttt.score = { you: 0, hoot: 0, tie: 0 };
+    const score = games.ttt.score;
+    if (!games.ttt.level) games.ttt.level = 'easy';
+    el.innerHTML = `<p class="hint">You are <b>❌</b>. Professor Hoot 🦉 is <b>⭕</b>. Get three in a row to win!</p>
+      <div class="stats"><span id="tturn">Your turn ❌</span><span id="tscore"></span></div>
+      <div class="ttt" id="ttt">${[...Array(9)].map((_, i) => `<button class="tcell" data-i="${i}"></button>`).join('')}</div>
+      <div class="row">
+        <button class="btn tlevel" data-l="easy">🙂 Easy</button><button class="btn tlevel" data-l="hard">😈 Hard</button>
+        <button class="btn" id="tnew">🔄 New game</button>
+      </div><p class="msg" id="tmsg"></p>`;
+    const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+    let B, turn, over, to, firstX = true;
+    const winner = b => { for (const l of LINES) if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return { p: b[l[0]], l }; return b.every(Boolean) ? { p: 'tie' } : null; };
+    function minimax(b, me) {
+      const w = winner(b);
+      if (w) return { s: w.p === 'O' ? 10 : w.p === 'X' ? -10 : 0 };
+      let best = { s: me === 'O' ? -99 : 99 };
+      b.forEach((v, i) => {
+        if (v) return;
+        b[i] = me; const r = minimax(b, me === 'O' ? 'X' : 'O'); b[i] = null;
+        const sc = r.s - Math.sign(r.s) * .1;
+        if (me === 'O' ? sc > best.s : sc < best.s) best = { s: sc, i };
+      });
+      return best;
     }
-    function pieceMoves(b, r, c) {
-      const p = b[r][c]; if (!p) return [];
-      const dirs = p.k ? [[1, 1], [1, -1], [-1, 1], [-1, -1]] : p.c === 'r' ? [[-1, 1], [-1, -1]] : [[1, 1], [1, -1]];
-      const out = [];
-      for (const [dr, dc] of dirs) {
-        const r1 = r + dr, c1 = c + dc, r2 = r + 2 * dr, c2 = c + 2 * dc;
-        if (inside(r1, c1) && !b[r1][c1]) out.push({ fr: r, fc: c, r: r1, c: c1 });
-        else if (inside(r2, c2) && b[r1][c1] && b[r1][c1].c !== p.c && !b[r2][c2]) out.push({ fr: r, fc: c, r: r2, c: c2, cap: [r1, c1] });
-      }
-      return out;
+    function hootMove() {
+      const empty = B.map((v, i) => v ? null : i).filter(v => v !== null);
+      let i;
+      if (games.ttt.level === 'easy' && Math.random() < .45) i = pick(empty);
+      else i = minimax(B.slice(), 'O').i;
+      if (i === undefined) i = pick(empty);
+      place(i, 'O');
     }
-    function allMoves(b, color, onlyFrom) {
-      let ms = [];
-      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++)
-        if (b[r][c] && b[r][c].c === color && (!onlyFrom || (onlyFrom[0] === r && onlyFrom[1] === c))) ms.push(...pieceMoves(b, r, c));
-      const jumps = ms.filter(m => m.cap);
-      return jumps.length || onlyFrom ? jumps : ms;
-    }
-    function apply(b, m) {
-      const p = b[m.fr][m.fc]; b[m.r][m.c] = p; b[m.fr][m.fc] = null;
-      if (m.cap) b[m.cap[0]][m.cap[1]] = null;
-      let kinged = false;
-      if (!p.k && ((p.c === 'r' && m.r === 0) || (p.c === 'b' && m.r === 7))) { p.k = true; kinged = true; }
-      return kinged;
-    }
-    function afterMove(m, kinged) {
-      if (m.cap && !kinged && allMoves(B, turn, [m.r, m.c]).length) { chain = [m.r, m.c]; sel = chain; render(); if (turn === 'b') to = setTimeout(aiMove, 450); return; }
-      chain = null; sel = null; turn = turn === 'r' ? 'b' : 'r';
-      if (!allMoves(B, turn).length) {
+    function place(i, p) {
+      B[i] = p; playNote(p === 'X' ? 72 : 67, .5);
+      const w = winner(B);
+      if (w) {
         over = true;
-        if (turn === 'b') { score.you++; $('#cmsg', el).textContent = '🏆 You beat Professor Hoot! "Hoo... hoo did that?!"'; }
-        else { score.hoot++; $('#cmsg', el).textContent = '🦉 Professor Hoot wins! "A wise move, if I say so myself." Try again!'; }
-      }
+        if (w.p === 'X') { score.you++; $('#tmsg', el).textContent = pick(['🏆 You win! Professor Hoot: "Hoo... HOO taught you that?!"', '🏆 Three in a row! Hoot is ruffling his feathers in shame.']); }
+        else if (w.p === 'O') { score.hoot++; $('#tmsg', el).textContent = pick(['🦉 Professor Hoot wins! "A wise move, if I say so myself."', '🦉 "Hoo-ray for me!" Try again!']); }
+        else { score.tie++; $('#tmsg', el).textContent = pick(["🤝 It's a tie! A cat's game. Hoot is unimpressed.", '🤝 Tie game! Great minds think alike.']); }
+        if (w.l) w.l.forEach(k => el.querySelector(`[data-i="${k}"]`).classList.add('tline'));
+      } else turn = p === 'X' ? 'O' : 'X';
       render();
-      if (turn === 'b' && !over) to = setTimeout(aiMove, 650);
+      if (!over && turn === 'O') to = setTimeout(hootMove, 550);
     }
-    function aiMove() {
-      const ms = allMoves(B, 'b', chain);
-      let bestM = null, bestS = -1e9;
-      for (const m of ms) {
-        const copy = B.map(row => row.map(p => p && { ...p }));
-        const kinged = apply(copy, m);
-        let s = Math.random() * 2 + (m.cap ? 10 : 0) + (kinged ? 6 : 0);
-        // would red be able to jump the piece we just moved?
-        if (allMoves(copy, 'r').some(rm => rm.cap && rm.cap[0] === m.r && rm.cap[1] === m.c)) s -= 7;
-        if (m.c === 0 || m.c === 7) s += 1;
-        if (s > bestS) { bestS = s; bestM = m; }
-      }
-      if (!bestM) return;
-      const kinged = apply(B, bestM);
-      afterMove(bestM, kinged);
-    }
-    boardEl.addEventListener('click', e => {
-      const cell = e.target.closest('.sq'); if (!cell || over || turn !== 'r') return;
-      const r = +cell.dataset.r, c = +cell.dataset.c, legal = allMoves(B, 'r', chain);
-      if (sel) {
-        const m = legal.find(m => m.fr === sel[0] && m.fc === sel[1] && m.r === r && m.c === c);
-        if (m) { const kinged = apply(B, m); afterMove(m, kinged); return; }
-      }
-      if (!chain && B[r][c] && B[r][c].c === 'r') {
-        if (legal.some(m => m.fr === r && m.fc === c)) { sel = [r, c]; $('#cmsg', el).textContent = ''; }
-        else { sel = null; $('#cmsg', el).textContent = legal.some(m => m.cap) ? 'You have a jump, so you must take it!' : "That piece can't move."; }
-        render();
-      }
-    });
     function render() {
-      const legal = turn === 'r' && !over ? allMoves(B, 'r', chain) : [];
-      const targets = sel ? legal.filter(m => m.fr === sel[0] && m.fc === sel[1]) : [];
-      let h = '';
-      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
-        const p = B[r][c], dark = (r + c) % 2 === 1;
-        const isSel = sel && sel[0] === r && sel[1] === c, isT = targets.some(m => m.r === r && m.c === c);
-        h += `<button class="sq ${dark ? 'dark' : 'light'}${isSel ? ' sel' : ''}${isT ? ' target' : ''}" data-r="${r}" data-c="${c}">${p ? `<span class="pc ${p.c}">${p.k ? '👑' : ''}</span>` : ''}</button>`;
-      }
-      boardEl.innerHTML = h;
-      $('#cturn', el).textContent = over ? 'Game over' : turn === 'r' ? (chain ? 'Keep jumping!' : 'Your turn 🔴') : 'Professor Hoot is thinking… 🦉';
-      $('#cscore', el).textContent = `You ${score.you} – ${score.hoot} Hoot`;
+      el.querySelectorAll('.tcell').forEach((c, i) => { c.textContent = B[i] === 'X' ? '❌' : B[i] === 'O' ? '⭕' : ''; c.disabled = !!B[i] || over || turn !== 'X'; });
+      $('#tturn', el).textContent = over ? 'Game over' : turn === 'X' ? 'Your turn ❌' : 'Professor Hoot is thinking… 🦉';
+      $('#tscore', el).textContent = `You ${score.you} · Hoot ${score.hoot} · Ties ${score.tie}`;
+      el.querySelectorAll('.tlevel').forEach(b => b.classList.toggle('on', b.dataset.l === games.ttt.level));
     }
-    $('#cnew', el).addEventListener('click', newGame);
+    function newGame() {
+      clearTimeout(to); B = Array(9).fill(null); over = false; $('#tmsg', el).textContent = '';
+      el.querySelectorAll('.tcell').forEach(c => c.classList.remove('tline'));
+      turn = firstX ? 'X' : 'O'; firstX = !firstX;   // take turns going first
+      render();
+      if (turn === 'O') { $('#tmsg', el).textContent = 'Professor Hoot goes first this time.'; to = setTimeout(hootMove, 650); }
+    }
+    $('#ttt', el).addEventListener('click', e => { const c = e.target.closest('.tcell'); if (!c || over || turn !== 'X' || B[+c.dataset.i]) return; place(+c.dataset.i, 'X'); });
+    el.querySelectorAll('.tlevel').forEach(b => b.addEventListener('click', () => { games.ttt.level = b.dataset.l; render(); }));
+    $('#tnew', el).addEventListener('click', newGame);
     newGame();
     return () => clearTimeout(to);
   }},
@@ -2272,7 +2241,7 @@ const places = [
   { key: 'lemonade', x: 410, y: 548, w: 132, h: 112, roofH: 32, style: 'awning', stripes: true, roof: '#ffcc1f', wall: '#c98d4f', windows: false, emoji: '🍋', size: 40, name: "Lulu's Lemonade", tag: 'Lemonade Rush' },
   { key: 'couch', x: 660, y: 514, w: 192, h: 150, roofH: 48, tower: true, roof: '#2f7d3a', wall: '#f3e2c4', emoji: '🛋️', name: 'Couch-Making Academy', tag: 'Cushion Stacker' },
   { key: 'nails', x: 985, y: 520, w: 180, h: 144, roofH: 36, style: 'awning', stripes: true, roof: '#ff7fae', wall: '#ffe3f1', emoji: '💅', name: 'Glitter Claws Nails', tag: 'Polish Panic' },
-  { key: 'checkers', x: 678, y: 762, w: 150, h: 108, roofH: 38, roof: '#22223a', wall: 'repeating-conic-gradient(#fff 0 25%, #f3c4c4 0 50%) 0 0/24px 24px', emoji: '🔴⚫', size: 26, name: 'Checkers Club', tag: 'Checkers Match' },
+  { key: 'ttt', x: 678, y: 762, w: 150, h: 108, roofH: 38, roof: '#22223a', wall: 'linear-gradient(90deg, transparent 32%, #2b1d3a 32% 35%, transparent 35% 65%, #2b1d3a 65% 68%, transparent 68%), #fff3f6', emoji: '❌⭕', size: 26, name: 'Tic-Tac-Toe Club', tag: 'Tic-Tac-Toe' },
   { key: 'zombies', x: 70, y: 62, w: 190, h: 143, roofH: 50, roof: '#3b2a4d', wall: '#7d8a76', win: '#a6ff8f', emoji: '🧟', size: 40, name: 'Chill Zombie Manor', tag: 'Explore' },
   { key: 'casino', x: 1010, y: 760, w: 172, h: 112, roofH: 36, style: 'flat', roof: 'linear-gradient(90deg,#2f9e44,#ffd84a,#2f9e44)', wall: '#1f4d2e', win: '#9dff8a', emoji: '🍀🎰', size: 34, name: 'Lucky Clover Casino', tag: '🔒 Locked' },
   { key: 'gym', x: 424, y: 244, w: 128, h: 144, roofH: 40, style: 'flat', roof: '#222', wall: 'linear-gradient(#ffffff 0 55%, #1d1d1d 55%)', emoji: '🐼', size: 40, name: 'Panda Gym', tag: 'Bamboo Workout' },
