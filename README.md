@@ -24,7 +24,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🏹 Fancy Archery | Perfume Panic: stick arrows in a spinning target without draining the leaky perfume bottle |
 | 🥄 Spoon Orchard | Spoon Harvest: pick ripe spoons, grab golden ones, avoid the forks |
 | 🏦 Secret bank | Find the hidden 🧱 in Penny Press, bring Granny's 💣, blow the vault, get ∞ casino coins |
-| 🦄 Unicorn Run | Its own 3D page (`unicorn.html`): run in place, step and jump in front of your camera to steer a unicorn through a forest (keyboard works too) |
+| 🦄 Unicorn Land | Camera games on their own pages: **Unicorn Run** (`unicorn.html`, 3D forest runner you control by running, stepping and jumping) and **Cupcake Party** (`unicorn-party.html`, up to 4 people become unicorns scooping raining cupcakes; every cupcake eaten paints a rainbow in the sky) |
 | 🎰 Lucky Clover Casino | Locked until you find the key. Spend coins (from pennies you stamp at The Penny House) on skin slots, then pick a skin in the wardrobe |
 
 Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.
