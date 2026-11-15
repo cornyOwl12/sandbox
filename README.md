@@ -4,7 +4,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 
 | Building | Game |
 |---|---|
-| 🐴 Hoofbeat Stables | Pony Derby: mash to win the race |
+| 🐴 Hoofbeat Stables | Grand Pony Derby: jump hurdles, dodge mud, grab carrots and stars, beat your best time |
 | ⛸️ Frosty Loop Rink | Snowflake Catch: catch ❄️ and ⭐, dodge 🐧 |
 | 🍋 Lulu's Lemonade | Lemonade Rush: make the right cup, fast |
 | 🖍️ Museum of Crayons | Art Studio: crayon, marker, rainbow, glitter, fill, stickers, mirror mode, undo/redo, daily themes and a curator who rates your art |

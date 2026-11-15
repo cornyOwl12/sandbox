@@ -447,34 +447,180 @@ function playNote(midi, dur = 1.4) {
 const galleryImgs = [];
 const games = {
 
-  /* 🐴 Pony Derby */
-  stable: { title: '🐴 Hoofbeat Stables: Pony Derby', start(el) {
-    const names = ['Sir Neighs-a-Lot (you!)', 'Buttercup', 'Pickles'];
-    el.innerHTML = `<p class="hint">You ride <b>Sir Neighs-a-Lot</b> in the top lane. Mash the button (or Space) to gallop!</p>
-      <div class="track">${names.map((n, i) => `<div class="lane"><span class="name">${n}</span><span class="horse" id="h${i}">${i === 0 ? '🐎' : '🐴'}</span><span class="finish">🏁</span></div>`).join('')}</div>
-      <div class="row"><button class="btn big" id="gallop">Giddy-up!</button></div><p class="msg" id="dmsg"></p>`;
-    const horses = [0, 1, 2].map(i => $('#h' + i, el)), msg = $('#dmsg', el), btn = $('#gallop', el);
-    let pos, state, iv, cd;
-    const draw = () => horses.forEach((h, i) => h.style.left = (Math.min(pos[i], 100) * .82) + '%');
-    function countdown() {
-      pos = [0, 0, 0]; draw(); state = 'wait'; btn.textContent = 'Giddy-up!';
-      let n = 3; msg.textContent = n;
-      cd = setInterval(() => { n--; if (n > 0) msg.textContent = n; else { clearInterval(cd); msg.textContent = 'GO!'; state = 'run'; iv = setInterval(tick, 100); } }, 700);
+  /* 🐴 Pony Derby: obstacle race */
+  stable: { title: '🐴 Hoofbeat Stables: The Grand Pony Derby', start(el) {
+    el.innerHTML = `<p class="hint">You ride <b>Sir Neighs-a-Lot 🎩</b>! He gallops on his own. Press <b>Space</b>, <b>↑</b>, <b>W</b> or click to <b>JUMP</b> over 🚧 hurdles and 🟫 mud. Grab 🥕 for a speed boost. A rare ⭐ makes you unstoppable!</p>
+      <div class="stats"><span id="dpos">Position: -</span><span id="dbest"></span><span id="dtime">⏱ 0.0s</span></div>
+      <canvas class="game" width="720" height="320" style="cursor:pointer"></canvas>
+      <div class="row"><button class="btn big" id="djump">⬆ JUMP</button><button class="btn" id="dagain">🔄 Race again</button></div>
+      <p class="msg" id="dmsg"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const LEN = 6000, PX = 170, GROUND = 262, BASE = 270;
+    const rivalsDef = [{ n: 'Buttercup', f: 'hue-rotate(160deg) saturate(1.4)', lane: 194, base: 262 }, { n: 'Pickles', f: 'hue-rotate(60deg) brightness(1.15)', lane: 212, base: 266 }];
+    let me, rivals, obs, state, t0, cd, raf, last, dust, pops, said, place, finishT, lastLeader, doneAt = 0;
+    function build() {
+      obs = []; let x = 500;
+      while (x < LEN - 300) {
+        const r = Math.random();
+        if (r < .42) obs.push({ k: 'hurdle', x });
+        else if (r < .62) obs.push({ k: 'mud', x, w: rand(110, 170) });
+        else if (r < .97) { const high = Math.random() < .5; for (let i = 0; i < 3; i++) obs.push({ k: 'carrot', x: x + i * 34, y: high ? 70 + Math.sin(i / 2 * Math.PI) * 25 : 18 }); }
+        else obs.push({ k: 'star', x, y: 80 });
+        x += rand(170, 300);
+      }
     }
-    function tick() { for (let i = 1; i < 3; i++) pos[i] += rand(.12, .78); check(); draw(); }
-    function check() {
-      const w = pos.findIndex(p => p >= 100);
-      if (w < 0) return;
-      state = 'done'; clearInterval(iv);
-      msg.textContent = w === 0 ? '🏆 Sir Neighs-a-Lot wins! You are a champion jockey!' : `${names[w]} won this time. 🥕 Have a carrot and try again!`;
-      btn.textContent = 'Race again';
+    function reset() {
+      build();
+      me = { d: 0, y: 0, vy: 0, sp: 0, boost: 0, stumble: 0, star: 0, legs: 0 };
+      rivals = rivalsDef.map(r => ({ ...r, d: 0, sp: 0, stumble: 0, legs: Math.random() * 6, hop: 0 }));
+      state = 'count'; cd = 3.4; dust = []; pops = []; said = {}; place = 0; finishT = 0; lastLeader = null;
+      $('#dmsg', el).textContent = ''; last = performance.now();
+      const best = save.derbyBest; $('#dbest', el).textContent = best ? `🏆 Best: ${best.toFixed(1)}s` : '🏆 Best: none yet';
     }
-    function gallop() { if (state === 'run') { pos[0] += 2.1; check(); draw(); } else if (state === 'done') countdown(); }
-    btn.addEventListener('click', () => { gallop(); btn.blur(); });
-    const kh = e => { if (e.code === 'Space') { e.preventDefault(); gallop(); } };
-    document.addEventListener('keydown', kh);
-    countdown();
-    return () => { clearInterval(iv); clearInterval(cd); document.removeEventListener('keydown', kh); };
+    function jump(fromKey) {
+      if (state === 'done') { if (!fromKey && performance.now() - doneAt > 900) reset(); return; }
+      if (state !== 'race' || me.y > 0.5 || me.stumble > 0) return;
+      me.vy = 560; playNote(76, .25);
+    }
+    c.addEventListener('pointerdown', jump);
+    $('#djump', el).addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
+    $('#dagain', el).addEventListener('click', reset);
+    const kd = e => { const k = e.key.toLowerCase(); if (k === ' ' || k === 'arrowup' || k === 'w') { e.preventDefault(); if (!e.repeat) jump(true); } };
+    document.addEventListener('keydown', kd);
+    const say = (key, txt) => { if (said[key]) return; said[key] = 1; $('#dmsg', el).textContent = '🎙️ ' + txt; };
+    function standings() { return [{ n: 'Sir Neighs-a-Lot', d: me.d, me: true }, ...rivals].sort((a, b) => b.d - a.d); }
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (state === 'count') {
+        const prev = Math.ceil(cd); cd -= dt;
+        if (Math.ceil(cd) !== prev && cd > 0) playNote(cd > 1 ? 67 : 79, .3);
+        if (cd <= 0) { state = 'race'; t0 = t; say('go', 'AND THEY\'RE OFF!'); }
+      }
+      const racing = state === 'race';
+      if (racing) {
+        // you
+        me.boost = Math.max(0, me.boost - dt); me.stumble = Math.max(0, me.stumble - dt); me.star = Math.max(0, me.star - dt);
+        let target = me.stumble > 0 ? 70 : BASE + (me.boost > 0 ? 170 : 0) + (me.star > 0 ? 200 : 0);
+        const inMud = me.y < 2 && obs.some(o => o.k === 'mud' && me.d + PX > o.x && me.d + PX < o.x + o.w);
+        if (inMud && me.star <= 0) { target *= .45; if (Math.random() < .3) dust.push({ x: PX - 10, y: GROUND - 4, vx: -rand(40, 90), vy: -rand(20, 80), t: .5, c: '#6b3f1f' }); }
+        me.sp += (target - me.sp) * Math.min(1, dt * 4);
+        me.d += me.sp * dt; me.legs += me.sp * dt / 18;
+        me.vy -= 1700 * dt; me.y = Math.max(0, me.y + me.vy * dt); if (me.y === 0) me.vy = 0;
+        for (const o of obs) {
+          if (o.hit) continue;
+          const sx = o.x - me.d;
+          if (o.k === 'hurdle' && Math.abs(sx - PX) < 22 && me.y < 38) {
+            o.hit = true;
+            if (me.star > 0) { pops.push({ x: PX, y: GROUND - 80, t: 1, txt: '⭐ SMASH!' }); }
+            else { me.stumble = .9; me.sp = 60; playNote(43, .4); pops.push({ x: PX, y: GROUND - 80, t: 1, txt: pick(['OOF!', 'Neigh-no!', 'Whoops!']) }); say('stumble' + Math.floor(me.d / 900), pick(['Ouch! Sir Neighs-a-Lot clips a hurdle!', 'A stumble from Sir Neighs-a-Lot! The crowd gasps!'])); }
+          }
+          if ((o.k === 'carrot' || o.k === 'star') && Math.abs(sx - PX) < 26 && Math.abs(me.y + 30 - o.y - 10) < 34) {
+            o.hit = true;
+            if (o.k === 'carrot') { me.boost = Math.min(2.5, me.boost + .9); playNote(84, .2); pops.push({ x: PX, y: GROUND - 90 - me.y, t: .7, txt: '🥕 +speed!' }); }
+            else { me.star = 3.5; playNote(88, .6); playNote(91, .6); say('star', 'A STAR! Sir Neighs-a-Lot is UNSTOPPABLE!'); }
+          }
+        }
+        if (me.sp > 200 && me.y === 0 && Math.random() < .5) dust.push({ x: PX - 22, y: GROUND - 2, vx: -rand(60, 140), vy: -rand(10, 50), t: .45, c: '#d6b98a' });
+        // rivals
+        for (const r of rivals) {
+          r.stumble = Math.max(0, r.stumble - dt); r.hop = Math.max(0, r.hop - dt);
+          const nextH = obs.find(o => o.k === 'hurdle' && o.x > r.d + PX - 5 && o.x < r.d + PX + 8);
+          if (nextH && !nextH['r' + r.n]) { nextH['r' + r.n] = 1; if (Math.random() < .22) r.stumble = .8; else r.hop = .35; }
+          const target = r.stumble > 0 ? 80 : r.base + Math.sin(t / 900 + r.lane) * 22 + (r.d < me.d - 500 ? 40 : 0);
+          r.sp += (target - r.sp) * Math.min(1, dt * 3); r.d += r.sp * dt; r.legs += r.sp * dt / 18;
+        }
+        // announcer
+        const st = standings(), leader = st[0];
+        if (leader.n !== lastLeader && t - t0 > 2500) { say('lead' + leader.n + Math.floor(me.d / 700), leader.me ? 'Sir Neighs-a-Lot takes the LEAD! 🎩' : `${leader.n} pulls ahead!`); }
+        lastLeader = leader.n;
+        if (me.d > LEN * .5) say('half', 'HALFWAY! What a race!');
+        if (me.d > LEN * .85) say('final', 'Here comes the final stretch!');
+        // finish
+        if (me.d >= LEN) {
+          state = 'done'; doneAt = performance.now(); finishT = (t - t0) / 1000;
+          place = 1 + rivals.filter(r => r.d >= LEN).length;
+          const medal = ['🥇', '🥈', '🥉'][place - 1];
+          const newBest = place === 1 && (!save.derbyBest || finishT < save.derbyBest);
+          if (newBest) { save.derbyBest = finishT; persist(); }
+          $('#dmsg', el).innerHTML = place === 1
+            ? `${medal} <b>Sir Neighs-a-Lot WINS</b> in ${finishT.toFixed(1)}s!${newBest ? ' 🎉 NEW BEST TIME!' : ''} (click the track to race again)`
+            : `${medal} You finished ${place === 2 ? '2nd' : '3rd'} in ${finishT.toFixed(1)}s. Fewer stumbles, more carrots! (click the track to race again)`;
+          $('#dbest', el).textContent = save.derbyBest ? `🏆 Best: ${save.derbyBest.toFixed(1)}s` : '🏆 Best: none yet';
+          if (place === 1) { const r = c.getBoundingClientRect(); for (let k = 0; k < 5; k++) setTimeout(() => launch(r.left + rand(0, r.width), r.top + rand(0, 80)), k * 150); }
+        }
+      }
+      // ---- draw ----
+      const camD = me.d;
+      const sky = ctx.createLinearGradient(0, 0, 0, 320); sky.addColorStop(0, '#8fd3ff'); sky.addColorStop(1, '#e7f6ff');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, 720, 320);
+      ctx.fillStyle = '#a8d8a0';
+      ctx.beginPath(); ctx.moveTo(0, 150); for (let x = 0; x <= 720; x += 20) ctx.lineTo(x, 130 + Math.sin((x + camD * .15) / 70) * 14); ctx.lineTo(720, 150); ctx.fill();
+      // crowd stands
+      ctx.fillStyle = '#c94a3f'; ctx.fillRect(0, 140, 720, 34);
+      ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const fans = ['🙂', '😃', '🤠', '👵', '🧟', '🐼', '🦆', '😄', '🥳'];
+      for (let i = -1; i < 26; i++) { const x = ((i * 30 - camD * .5) % 780 + 780) % 780 - 30; ctx.fillText(fans[(i + 30) % fans.length], x, 152 + (racing && Math.sin(t / 120 + i) > .6 ? -4 : 0)); }
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 172, 720, 4);
+      // track
+      ctx.fillStyle = '#c99a5b'; ctx.fillRect(0, 176, 720, 144);
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2; ctx.setLineDash([16, 14]);
+      [203, 224].forEach(y => { ctx.beginPath(); ctx.moveTo(-(camD % 30), y); ctx.lineTo(720, y); ctx.stroke(); }); ctx.setLineDash([]);
+      // distance markers + finish
+      for (let m = 1000; m < LEN; m += 1000) { const x = m - camD + PX; if (x > -40 && x < 760) { ctx.fillStyle = '#fff'; ctx.fillRect(x, 176, 4, 144); ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 12px Trebuchet MS'; ctx.fillText(m / 10 + 'm', x, 184); } }
+      const fx = LEN - camD + PX;
+      if (fx < 760) { for (let i = 0; i < 18; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#222'; ctx.fillRect(fx, 176 + i * 8, 8, 8); ctx.fillStyle = i % 2 ? '#222' : '#fff'; ctx.fillRect(fx + 8, 176 + i * 8, 8, 8); } ctx.font = '30px serif'; ctx.fillText('🏁', fx + 8, 120); }
+      // rivals (back lanes)
+      for (const r of rivals) {
+        const x = r.d - camD + PX; if (x < -60 || x > 780) continue;
+        const hop = r.hop > 0 ? Math.sin((1 - r.hop / .35) * Math.PI) * 26 : 0, bob = Math.abs(Math.sin(r.legs)) * 4;
+        ctx.save(); ctx.translate(x, r.lane - hop - bob); ctx.scale(-1, 1); ctx.filter = r.f; ctx.fillStyle = '#000'; ctx.font = '34px serif'; ctx.fillText('🐎', 0, 0); ctx.restore();
+        ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 10px Trebuchet MS'; ctx.fillText(r.n, x, r.lane - 24 - hop);
+        if (r.stumble > 0) { ctx.font = '14px serif'; ctx.fillText('💫', x, r.lane - 40); }
+      }
+      // obstacles (your lane)
+      for (const o of obs) {
+        const x = o.x - camD + PX; if (x < -200 || x > 800) continue;
+        if (o.k === 'mud') { ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.ellipse(x + o.w / 2, GROUND + 6, o.w / 2, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#7d5230'; ctx.beginPath(); ctx.ellipse(x + o.w / 2 - 10, GROUND + 4, o.w / 4, 4, 0, 0, Math.PI * 2); ctx.fill(); }
+        if (o.k === 'hurdle') {
+          ctx.save(); if (o.hit) { ctx.translate(x, GROUND); ctx.rotate(.9); ctx.translate(-x, -GROUND); }
+          ctx.fillStyle = '#fff'; ctx.fillRect(x - 16, GROUND - 34, 4, 36); ctx.fillRect(x + 12, GROUND - 34, 4, 36);
+          for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#e8364f'; ctx.fillRect(x - 16 + i * 8, GROUND - 36, 8, 8); ctx.fillRect(x - 16 + i * 8, GROUND - 20, 8, 6); }
+          ctx.restore();
+        }
+        if ((o.k === 'carrot' || o.k === 'star') && !o.hit) { ctx.font = o.k === 'star' ? '28px serif' : '22px serif'; ctx.fillText(o.k === 'star' ? '⭐' : '🥕', x, GROUND - 10 - o.y + Math.sin(t / 200 + o.x) * 3); }
+      }
+      // dust
+      dust.forEach(p => { p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 200 * dt; ctx.globalAlpha = Math.max(0, p.t * 2); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; });
+      dust = dust.filter(p => p.t > 0);
+      // you
+      const bob = me.y === 0 ? Math.abs(Math.sin(me.legs)) * 5 : 0, tilt = me.stumble > 0 ? Math.sin(t / 60) * .3 : me.y > 0 ? -.15 : 0;
+      ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(PX, GROUND + 6, 26 - me.y / 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+      if (me.boost > 0 || me.star > 0) { ctx.strokeStyle = me.star > 0 ? `hsl(${t / 3 % 360},90%,60%)` : 'rgba(255,255,255,.8)'; ctx.lineWidth = 3; for (let i = 0; i < 4; i++) { const y = GROUND - 20 - i * 9 - me.y; ctx.beginPath(); ctx.moveTo(PX - 40 - i * 6, y); ctx.lineTo(PX - 70 - i * 12, y); ctx.stroke(); } }
+      ctx.save(); ctx.translate(PX, GROUND - 22 - me.y - bob); ctx.rotate(tilt);
+      if (me.star > 0) ctx.filter = `hue-rotate(${t / 2 % 360}deg) saturate(2)`;
+      ctx.fillStyle = '#000';  // emoji take the alpha of fillStyle, so make it opaque
+
+      ctx.scale(-1, 1); ctx.font = '56px serif'; ctx.fillText('🐎', 0, 0); ctx.filter = 'none';
+      ctx.fillStyle = '#e8364f'; ctx.fillRect(-6, -14, 18, 9); ctx.fillStyle = '#ffd84a'; ctx.fillRect(-6, -6, 18, 2); ctx.restore();
+      ctx.fillStyle = '#e8364f'; ctx.font = 'bold 11px Trebuchet MS'; ctx.fillText('YOU', PX - 2, GROUND - 74 - me.y - bob);
+      ctx.font = '20px serif'; ctx.fillText('🎩', PX + 14, GROUND - 58 - me.y - bob);
+      if (me.stumble > 0) { ctx.font = '18px serif'; ctx.fillText('💫', PX, GROUND - 78 - me.y); }
+      pops.forEach(p => { p.t -= dt; p.y -= 30 * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 15px Trebuchet MS'; ctx.fillText(p.txt, p.x + 30, p.y); ctx.globalAlpha = 1; });
+      pops = pops.filter(p => p.t > 0);
+      // progress bar
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(20, 10, 680, 22); ctx.strokeStyle = '#2b1d3a'; ctx.lineWidth = 2; ctx.strokeRect(20, 10, 680, 22);
+      ctx.font = '14px serif'; ctx.fillText('🏁', 690, 21);
+      rivals.forEach(r => { ctx.save(); ctx.translate(30 + Math.min(1, r.d / LEN) * 650, 21); ctx.scale(-1, 1); ctx.filter = r.f; ctx.font = '16px serif'; ctx.fillText('🐎', 0, 0); ctx.restore(); });
+      ctx.save(); ctx.translate(30 + Math.min(1, me.d / LEN) * 650, 21); ctx.scale(-1.2, 1.2); ctx.font = '16px serif'; ctx.fillText('🐎', 0, 0); ctx.restore(); ctx.font = '10px serif'; ctx.fillText('🎩', 34 + Math.min(1, me.d / LEN) * 650, 11);
+      if (state === 'count') { ctx.fillStyle = 'rgba(43,29,58,.55)'; ctx.fillRect(0, 0, 720, 320); ctx.fillStyle = '#fff'; ctx.font = 'bold 80px Trebuchet MS'; ctx.fillText(cd > 0.4 ? Math.ceil(cd - .4) || 'GO!' : 'GO!', 360, 160); }
+      ctx.textBaseline = 'alphabetic';
+      const st = standings(), pos = st.findIndex(s => s.me) + 1;
+      $('#dpos', el).textContent = `Position: ${state === 'done' ? ['🥇', '🥈', '🥉'][place - 1] : ['1st 🥇', '2nd 🥈', '3rd 🥉'][pos - 1]}`;
+      $('#dtime', el).textContent = '⏱ ' + (state === 'race' ? ((t - t0) / 1000).toFixed(1) : state === 'done' ? finishT.toFixed(1) : '0.0') + 's';
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); };
   }},
 
   /* ⛸️ Snowflake Catch */
@@ -2234,7 +2380,7 @@ function building(b) {
   </div>`;
 }
 const places = [
-  { key: 'stable', x: 58, y: 256, w: 140, h: 132, roofH: 44, size: 36, roof: '#8a2f27', wall: '#c94a3f', emoji: '🐴', name: 'Hoofbeat Stables', tag: 'Pony Derby' },
+  { key: 'stable', x: 58, y: 256, w: 140, h: 132, roofH: 44, size: 36, roof: '#8a2f27', wall: '#c94a3f', emoji: '🐴', name: 'Hoofbeat Stables', tag: 'Grand Pony Derby' },
   { key: 'crayon', x: 670, y: 232, w: 260, h: 156, roofH: 46, style: 'pediment', roof: '#e9e1f5',
     wall: 'repeating-linear-gradient(90deg, #f6f0ff 0 22px, #ddd0f2 22px 30px)', emoji: '🖍️', name: 'Museum of Crayons', tag: 'Draw a Masterpiece' },
   { key: 'hats', x: 985, y: 245, w: 175, h: 143, roofH: 30, style: 'flat', roof: '#22223a', wall: '#ffd1dc', emoji: '🎩', name: 'Hats Hats Hats', tag: 'Hat Rush' },
@@ -2351,7 +2497,7 @@ function openGame(key) {
   closeGame(false);
   const g = games[key];
   $('#mtitle').textContent = g.title;
-  $('.panel').classList.toggle('wide', ['mountain', 'zombies', 'crayon', 'piano'].includes(key));
+  $('.panel').classList.toggle('wide', ['mountain', 'zombies', 'crayon', 'piano', 'stable'].includes(key));
   $('#modal').classList.remove('hidden');
   cleanup = g.start($('#game')) || null;
   // the tiny piano zooms up from where it sits on the map
