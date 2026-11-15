@@ -276,6 +276,7 @@
   .kp-x { position: absolute; top: 6px; right: 6px; background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; }
   .dtool.on { background: #8fd3ff; box-shadow: 0 3px 0 var(--ink), inset 0 0 0 2px #1f5fbf; }
   .stadium { background: repeating-linear-gradient(90deg, #3f9a45 0 18px, #47a84d 18px 36px); border-color: #fff; }
+  .archery { background: repeating-linear-gradient(45deg, #ffd1e8 0 12px, #fbe4ef 12px 24px); border-color: #d6338a; }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -2284,6 +2285,142 @@ const games = {
     return () => cancelAnimationFrame(raf);
   }},
 
+  /* 🏹 Perfume Archery */
+  archery: { title: '🏹 Fancy Archery: Perfume Panic', start(el) {
+    el.innerHTML = `<p class="hint">Stick arrows into the spinning target! Press <b>Space</b> or click to shoot. The 🧴 perfume bottle is <b>leaking</b>. Don't let it run dry! Hitting the bottle or another arrow makes it gush. Hit a 🌸 to top it up.</p>
+      <div class="stats"><span id="arS">🏹 Arrows: 0</span><span id="arR">Round 1</span><span id="arB"></span></div>
+      <canvas class="game" width="480" height="340" style="cursor:crosshair"></canvas><p class="msg" id="arM"></p>`;
+    const c = $('canvas', el), ctx = c.getContext('2d');
+    const CX = 240, CY = 132, RAD = 72, SHOOT_Y = 312, NEAR = .2, BOTTLE_W = .26;
+    let ang, spin, stuck, flowers, bottleAng, perfume, score, round, need, state, arrow, falling, drops, pops, raf, last, wob, tSpin;
+    function newRound() {
+      stuck = []; need = 6 + round; bottleAng = rand(0, Math.PI * 2); tSpin = 0;
+      flowers = []; const nf = round === 1 ? 1 : 2;
+      for (let i = 0; i < nf; i++) { let a; do { a = rand(0, Math.PI * 2); } while (Math.abs(angDiff(a, bottleAng)) < .7); flowers.push(a); }
+      // a few pre-stuck arrows from round 3 on
+      for (let i = 0; i < Math.min(round - 2, 4); i++) { let a; do { a = rand(0, Math.PI * 2); } while (Math.abs(angDiff(a, bottleAng)) < .5 || stuck.some(s => Math.abs(angDiff(s, a)) < .5)); stuck.push(a); }
+    }
+    function reset() {
+      ang = 0; spin = 1.6; perfume = 100; score = 0; round = 1; state = 'play'; arrow = null; falling = []; drops = []; pops = []; wob = 0;
+      newRound(); last = performance.now(); $('#arM', el).textContent = '';
+      $('#arB', el).textContent = save.archeryBest ? `🏆 Best: ${save.archeryBest}` : '🏆 Best: none yet';
+    }
+    const angDiff = (a, b) => { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
+    function shoot() {
+      if (state === 'over') { reset(); return; }
+      if (state !== 'play' || arrow) return;
+      arrow = { y: SHOOT_Y }; playNote(70, .12);
+    }
+    c.addEventListener('pointerdown', shoot);
+    const kd = e => { if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) shoot(); } };
+    document.addEventListener('keydown', kd);
+    function pop(txt, col) { pops.push({ x: CX, y: CY + RAD + 30, t: 1, txt, col }); }
+    function splash(n, a) {
+      const wx = CX + Math.cos(a) * (RAD + 14), wy = CY + Math.sin(a) * (RAD + 14);
+      for (let i = 0; i < n; i++) drops.push({ x: wx, y: wy, vx: rand(-140, 140), vy: rand(-180, 40), t: rand(.6, 1.2), big: true });
+    }
+    function hitTarget() {
+      const local = Math.PI / 2 - ang;   // where on the target the arrow lands (bottom of the circle)
+      if (Math.abs(angDiff(local, bottleAng)) < BOTTLE_W) {
+        perfume -= 28; wob = 1; splash(30, ang + bottleAng); playNote(40, .5);
+        pop(pick(['SPLOOSH! 💦', 'Not the perfume!!', 'Smells AMAZING (it\'s everywhere)']), '#c4182f');
+        falling.push({ x: CX, y: CY + RAD, vy: -120, rot: 0 }); return;
+      }
+      if (stuck.some(s => Math.abs(angDiff(s, local)) < NEAR)) {
+        perfume -= 12; wob = .6; playNote(50, .3); pop('CLANK! 🏹💥', '#c4182f');
+        falling.push({ x: CX, y: CY + RAD, vy: -160, rot: 0 }); return;
+      }
+      stuck.push(local); score++; playNote(76 + (score % 5), .15);
+      const fi = flowers.findIndex(f => Math.abs(angDiff(f, local)) < .22);
+      if (fi >= 0) { flowers.splice(fi, 1); perfume = Math.min(100, perfume + 15); pop('🌸 +15% perfume!', '#d6338a'); playNote(88, .3); }
+      if (stuck.filter((_, i) => i >= Math.min(round - 2, 4) || round < 3).length >= need) {
+        state = 'clear'; perfume = Math.min(100, perfume + 10);
+        pop(`✨ Round ${round} clear! +10%`, '#1f7a3a'); playNote(84, .4); playNote(91, .5);
+        setTimeout(() => { if (state !== 'clear') return; round++; spin = (1.6 + round * .28) * (round % 2 ? 1 : -1); newRound(); state = 'play'; }, 1100);
+      }
+    }
+    function loop(t) {
+      const dt = Math.min((t - last) / 1000, .05); last = t;
+      if (state === 'play' || state === 'clear') {
+        tSpin += dt;
+        const wobbleSpin = round >= 3 ? Math.sin(tSpin * (.9 + round * .1)) * (.6 + round * .15) : 0;
+        ang += (spin + wobbleSpin) * dt;
+        perfume -= (1.8 + round * .35) * dt;
+        if (Math.random() < .35) { const a = ang + bottleAng, wx = CX + Math.cos(a) * (RAD + 14), wy = CY + Math.sin(a) * (RAD + 14); drops.push({ x: wx, y: wy + 8, vx: rand(-10, 10), vy: rand(20, 60), t: 1.2 }); }
+        if (arrow) {
+          arrow.y -= 1500 * dt;
+          if (arrow.y <= CY + RAD) { arrow = null; if (state === 'play') hitTarget(); }
+        }
+        if (perfume <= 0) {
+          perfume = 0; state = 'over';
+          const best = !save.archeryBest || score > save.archeryBest; if (best) { save.archeryBest = score; persist(); }
+          $('#arM', el).textContent = `💨 The perfume ran dry! You stuck ${score} arrows and reached round ${round}.${best ? ' 🎉 NEW BEST!' : ''} Click to play again.`;
+          $('#arB', el).textContent = `🏆 Best: ${save.archeryBest}`;
+        }
+      }
+      wob = Math.max(0, wob - dt * 2);
+      // ---- draw ----
+      ctx.fillStyle = '#fbe4ef'; ctx.fillRect(0, 0, 480, 340);
+      ctx.fillStyle = '#f6cfe1'; for (let x = 0; x < 480; x += 40) for (let y = 0; y < 340; y += 40) { ctx.beginPath(); ctx.arc(x + ((y / 40) % 2) * 20, y, 3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#e3b5c9'; ctx.fillRect(0, 300, 480, 40);
+      // perfume gauge
+      ctx.fillStyle = '#fff'; ctx.fillRect(18, 40, 22, 200); ctx.strokeStyle = '#2b1d3a'; ctx.lineWidth = 2; ctx.strokeRect(18, 40, 22, 200);
+      const g = ctx.createLinearGradient(0, 240, 0, 40); g.addColorStop(0, '#d6338a'); g.addColorStop(1, '#ffb3dc');
+      ctx.fillStyle = perfume < 25 ? (Math.sin(t / 100) > 0 ? '#e8364f' : '#ff9aa8') : g; ctx.fillRect(20, 240 - perfume * 1.98, 18, perfume * 1.98);
+      ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 12px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText('🧴', 29, 30); ctx.fillText(Math.ceil(perfume) + '%', 29, 256);
+      // stuck arrows (behind target)
+      const drawArrow = (a, inner) => {
+        const ex = CX + Math.cos(a) * RAD * inner, ey = CY + Math.sin(a) * RAD * inner, ox = CX + Math.cos(a) * (RAD + 62), oy = CY + Math.sin(a) * (RAD + 62);
+        ctx.strokeStyle = '#7a4a26'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ox, oy); ctx.stroke();
+        ctx.fillStyle = '#e8364f'; ctx.save(); ctx.translate(ox, oy); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-14, -6); ctx.lineTo(-10, 0); ctx.lineTo(-14, 6); ctx.fill(); ctx.restore();
+      };
+      stuck.forEach(s => drawArrow(ang + s, .82));
+      // target
+      const wx = Math.sin(t / 30) * wob * 4;
+      ctx.save(); ctx.translate(CX + wx, CY); ctx.rotate(ang);
+      [[RAD, '#7a4a26'], [RAD - 6, '#fff'], [RAD - 18, '#e8364f'], [RAD - 30, '#fff'], [RAD - 42, '#e8364f'], [RAD - 54, '#fff'], [10, '#ffd84a']].forEach(([r, col]) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); });
+      ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.lineWidth = 2; for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(i * Math.PI / 4) * (RAD - 6), Math.sin(i * Math.PI / 4) * (RAD - 6)); ctx.stroke(); }
+      // flowers on the rim
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
+      flowers.forEach(f => { ctx.save(); ctx.rotate(f); ctx.translate(RAD - 4, 0); ctx.font = '20px serif'; ctx.fillText('🌸', 0, 0); ctx.restore(); });
+      // the leaky perfume bottle strapped to the rim (shows how much is left)
+      ctx.save(); ctx.rotate(bottleAng); ctx.translate(RAD + 12, 0); ctx.rotate(Math.PI / 2);
+      ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.strokeStyle = '#2b1d3a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-16, -18, 32, 34, 8) : ctx.rect(-16, -18, 32, 34); ctx.fill(); ctx.stroke();
+      const lvl = Math.max(0, perfume) / 100 * 30; ctx.fillStyle = '#e05aa5'; ctx.fillRect(-14, 14 - lvl, 28, lvl);
+      ctx.fillStyle = '#ffd84a'; ctx.fillRect(-6, -26, 12, 8); ctx.fillStyle = '#d6338a'; ctx.beginPath(); ctx.arc(0, -30, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7a4a26'; ctx.fillRect(-18, -2, 36, 4);
+      ctx.restore();
+      ctx.restore();
+      // perfume drops + sparkle smell
+      drops.forEach(d => { d.t -= dt; d.vy += 420 * dt; d.x += d.vx * dt; d.y += d.vy * dt; if (d.y > 300) { d.y = 300; d.vy = 0; d.vx *= .9; }
+        ctx.globalAlpha = Math.max(0, Math.min(1, d.t)); ctx.fillStyle = '#e05aa5'; ctx.beginPath(); ctx.arc(d.x, d.y, d.big ? 4 : 2.5, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; });
+      drops = drops.filter(d => d.t > 0);
+      if (Math.sin(t / 400) > .3) { ctx.globalAlpha = .5; ctx.font = '14px serif'; ctx.fillText('✨', CX + Math.cos(ang + bottleAng) * (RAD + 34), CY + Math.sin(ang + bottleAng) * (RAD + 34) - 10); ctx.globalAlpha = 1; }
+      // falling bounced arrows
+      falling.forEach(f => { f.vy += 900 * dt; f.y += f.vy * dt; f.rot += dt * 10; ctx.save(); ctx.translate(f.x + f.rot * 8, f.y); ctx.rotate(f.rot); ctx.strokeStyle = '#7a4a26'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(0, 30); ctx.stroke(); ctx.restore(); });
+      falling = falling.filter(f => f.y < 400);
+      // flying / ready arrow
+      const ay = arrow ? arrow.y : SHOOT_Y;
+      if (state === 'play' || arrow) {
+        ctx.strokeStyle = '#7a4a26'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(CX, ay); ctx.lineTo(CX, ay + 62); ctx.stroke();
+        ctx.fillStyle = '#555'; ctx.beginPath(); ctx.moveTo(CX, ay - 8); ctx.lineTo(CX - 5, ay + 2); ctx.lineTo(CX + 5, ay + 2); ctx.fill();
+        ctx.fillStyle = '#e8364f'; ctx.beginPath(); ctx.moveTo(CX, ay + 50); ctx.lineTo(CX - 7, ay + 64); ctx.lineTo(CX, ay + 58); ctx.lineTo(CX + 7, ay + 64); ctx.fill();
+      }
+      ctx.fillStyle = '#000'; ctx.font = '30px serif'; ctx.fillText(save.skin, CX + 46, 318);
+      // progress dots for this round
+      const base = round >= 3 ? Math.min(round - 2, 4) : 0, done = Math.max(0, stuck.length - base);
+      for (let i = 0; i < need; i++) { ctx.fillStyle = i < done ? '#7a4a26' : 'rgba(122,74,38,.25)'; ctx.fillRect(452, 290 - i * 14, 14, 9); }
+      pops.forEach(p => { p.t -= dt; p.y -= 25 * dt; ctx.globalAlpha = Math.max(0, p.t); ctx.fillStyle = p.col; ctx.font = 'bold 16px Trebuchet MS'; ctx.fillText(p.txt, p.x, p.y); ctx.globalAlpha = 1; });
+      pops = pops.filter(p => p.t > 0);
+      ctx.textBaseline = 'alphabetic';
+      $('#arS', el).textContent = `🏹 Arrows: ${score}`; $('#arR', el).textContent = `Round ${round}`;
+      raf = requestAnimationFrame(loop);
+    }
+    reset(); raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); };
+  }},
+
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
     el.innerHTML = `<p class="hint">Help the cheese 🧀 ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
@@ -2584,6 +2721,15 @@ add(`<div class="paddock stadium" data-key="teacup" style="left:610px;top:132px;
   <span style="position:absolute;left:14px;top:22px;font-size:24px">🏈</span>
   <span style="position:absolute;right:16px;top:14px;font-size:34px">☕</span>
   <span class="play-tag" style="bottom:-12px">🎮 Tea-Down Toss</span>
+</div>`);
+
+// fancy archery range on the hill
+add(`<div class="paddock archery" data-key="archery" style="left:438px;top:132px;width:156px;height:73px">
+  <span class="sign" style="top:-16px">🏹 Fancy Archery</span>
+  <span style="position:absolute;left:16px;top:16px;font-size:34px">🎯</span>
+  <span style="position:absolute;left:62px;top:24px;font-size:22px">🏹</span>
+  <span style="position:absolute;right:16px;top:20px;font-size:26px">🧴</span>
+  <span class="play-tag" style="bottom:-12px">🎮 Perfume Panic</span>
 </div>`);
 
 // horse paddock (part of the stables)
