@@ -457,7 +457,18 @@ const games = {
     const c = $('canvas', el), ctx = c.getContext('2d');
     const LEN = 6000, PX = 170, GROUND = 262, BASE = 270;
     const rivalsDef = [{ n: 'Buttercup', f: 'hue-rotate(160deg) saturate(1.4)', lane: 194, base: 262 }, { n: 'Pickles', f: 'hue-rotate(60deg) brightness(1.15)', lane: 212, base: 266 }];
-    let me, rivals, obs, state, t0, cd, raf, last, dust, pops, said, place, finishT, lastLeader, doneAt = 0;
+    let me, rivals, obs, state, t0, cd, raf, last, dust, pops, said, place, finishT, lastLeader, doneAt = 0, jumpBuf = 0;
+    // pre-draw emoji (with their color filters) once; canvas filters are slow to run every frame
+    const sprites = {};
+    function spr(e, size, filter = 'none', flip = true) {
+      const k = e + size + filter + flip; if (sprites[k]) return sprites[k];
+      const cv = document.createElement('canvas'), pad = Math.ceil(size * .35); cv.width = cv.height = size + pad * 2;
+      const x = cv.getContext('2d'); x.filter = filter; x.font = `${size}px serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#000';
+      if (flip) { x.translate(cv.width, 0); x.scale(-1, 1); }
+      x.fillText(e, cv.width / 2, cv.height / 2);
+      return sprites[k] = cv;
+    }
+    const blit = (cv, x, y) => ctx.drawImage(cv, x - cv.width / 2, y - cv.height / 2);
     function build() {
       obs = []; let x = 500;
       while (x < LEN - 300) {
@@ -479,10 +490,11 @@ const games = {
     }
     function jump(fromKey) {
       if (state === 'done') { if (!fromKey && performance.now() - doneAt > 900) reset(); return; }
-      if (state !== 'race' || me.y > 0.5 || me.stumble > 0) return;
-      me.vy = 560; playNote(76, .25);
+      if (state !== 'race') return;
+      jumpBuf = .18; tryJump();
     }
-    c.addEventListener('pointerdown', jump);
+    function tryJump() { if (jumpBuf > 0 && me.y <= 2 && me.vy <= 0 && me.stumble <= .15) { jumpBuf = 0; me.stumble = 0; me.vy = 560; playNote(76, .25); } }
+    c.addEventListener('pointerdown', () => jump());
     $('#djump', el).addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
     $('#dagain', el).addEventListener('click', reset);
     const kd = e => { const k = e.key.toLowerCase(); if (k === ' ' || k === 'arrowup' || k === 'w') { e.preventDefault(); if (!e.repeat) jump(true); } };
@@ -506,6 +518,7 @@ const games = {
         me.sp += (target - me.sp) * Math.min(1, dt * 4);
         me.d += me.sp * dt; me.legs += me.sp * dt / 18;
         me.vy -= 1700 * dt; me.y = Math.max(0, me.y + me.vy * dt); if (me.y === 0) me.vy = 0;
+        jumpBuf = Math.max(0, jumpBuf - dt); tryJump();
         for (const o of obs) {
           if (o.hit) continue;
           const sx = o.x - me.d;
@@ -559,7 +572,7 @@ const games = {
       ctx.fillStyle = '#c94a3f'; ctx.fillRect(0, 140, 720, 34);
       ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const fans = ['🙂', '😃', '🤠', '👵', '🧟', '🐼', '🦆', '😄', '🥳'];
-      for (let i = -1; i < 26; i++) { const x = ((i * 30 - camD * .5) % 780 + 780) % 780 - 30; ctx.fillText(fans[(i + 30) % fans.length], x, 152 + (racing && Math.sin(t / 120 + i) > .6 ? -4 : 0)); }
+      for (let i = -1; i < 26; i++) { const x = ((i * 30 - camD * .5) % 780 + 780) % 780 - 30; blit(spr(fans[(i + 30) % fans.length], 16, 'none', false), x, 152 + (racing && Math.sin(t / 120 + i) > .6 ? -4 : 0)); }
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 172, 720, 4);
       // track
       ctx.fillStyle = '#c99a5b'; ctx.fillRect(0, 176, 720, 144);
@@ -573,7 +586,7 @@ const games = {
       for (const r of rivals) {
         const x = r.d - camD + PX; if (x < -60 || x > 780) continue;
         const hop = r.hop > 0 ? Math.sin((1 - r.hop / .35) * Math.PI) * 26 : 0, bob = Math.abs(Math.sin(r.legs)) * 4;
-        ctx.save(); ctx.translate(x, r.lane - hop - bob); ctx.scale(-1, 1); ctx.filter = r.f; ctx.fillStyle = '#000'; ctx.font = '34px serif'; ctx.fillText('🐎', 0, 0); ctx.restore();
+        blit(spr('🐎', 34, r.f), x, r.lane - hop - bob);
         ctx.fillStyle = '#2b1d3a'; ctx.font = 'bold 10px Trebuchet MS'; ctx.fillText(r.n, x, r.lane - 24 - hop);
         if (r.stumble > 0) { ctx.font = '14px serif'; ctx.fillText('💫', x, r.lane - 40); }
       }
@@ -597,11 +610,8 @@ const games = {
       ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(PX, GROUND + 6, 26 - me.y / 8, 6, 0, 0, Math.PI * 2); ctx.fill();
       if (me.boost > 0 || me.star > 0) { ctx.strokeStyle = me.star > 0 ? `hsl(${t / 3 % 360},90%,60%)` : 'rgba(255,255,255,.8)'; ctx.lineWidth = 3; for (let i = 0; i < 4; i++) { const y = GROUND - 20 - i * 9 - me.y; ctx.beginPath(); ctx.moveTo(PX - 40 - i * 6, y); ctx.lineTo(PX - 70 - i * 12, y); ctx.stroke(); } }
       ctx.save(); ctx.translate(PX, GROUND - 22 - me.y - bob); ctx.rotate(tilt);
-      if (me.star > 0) ctx.filter = `hue-rotate(${t / 2 % 360}deg) saturate(2)`;
-      ctx.fillStyle = '#000';  // emoji take the alpha of fillStyle, so make it opaque
-
-      ctx.scale(-1, 1); ctx.font = '56px serif'; ctx.fillText('🐎', 0, 0); ctx.filter = 'none';
-      ctx.fillStyle = '#e8364f'; ctx.fillRect(-6, -14, 18, 9); ctx.fillStyle = '#ffd84a'; ctx.fillRect(-6, -6, 18, 2); ctx.restore();
+      blit(spr('🐎', 56, me.star > 0 ? `hue-rotate(${Math.floor(t / 80) % 12 * 30}deg) saturate(2)` : 'none'), 0, 0);
+      ctx.scale(-1, 1); ctx.fillStyle = '#e8364f'; ctx.fillRect(-6, -14, 18, 9); ctx.fillStyle = '#ffd84a'; ctx.fillRect(-6, -6, 18, 2); ctx.restore();
       ctx.fillStyle = '#e8364f'; ctx.font = 'bold 11px Trebuchet MS'; ctx.fillText('YOU', PX - 2, GROUND - 74 - me.y - bob);
       ctx.font = '20px serif'; ctx.fillText('🎩', PX + 14, GROUND - 58 - me.y - bob);
       if (me.stumble > 0) { ctx.font = '18px serif'; ctx.fillText('💫', PX, GROUND - 78 - me.y); }
@@ -610,8 +620,8 @@ const games = {
       // progress bar
       ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(20, 10, 680, 22); ctx.strokeStyle = '#2b1d3a'; ctx.lineWidth = 2; ctx.strokeRect(20, 10, 680, 22);
       ctx.font = '14px serif'; ctx.fillText('🏁', 690, 21);
-      rivals.forEach(r => { ctx.save(); ctx.translate(30 + Math.min(1, r.d / LEN) * 650, 21); ctx.scale(-1, 1); ctx.filter = r.f; ctx.font = '16px serif'; ctx.fillText('🐎', 0, 0); ctx.restore(); });
-      ctx.save(); ctx.translate(30 + Math.min(1, me.d / LEN) * 650, 21); ctx.scale(-1.2, 1.2); ctx.font = '16px serif'; ctx.fillText('🐎', 0, 0); ctx.restore(); ctx.font = '10px serif'; ctx.fillText('🎩', 34 + Math.min(1, me.d / LEN) * 650, 11);
+      rivals.forEach(r => blit(spr('🐎', 16, r.f), 30 + Math.min(1, r.d / LEN) * 650, 21));
+      blit(spr('🐎', 19), 30 + Math.min(1, me.d / LEN) * 650, 21); ctx.font = '10px serif'; ctx.fillText('🎩', 34 + Math.min(1, me.d / LEN) * 650, 11);
       if (state === 'count') { ctx.fillStyle = 'rgba(43,29,58,.55)'; ctx.fillRect(0, 0, 720, 320); ctx.fillStyle = '#fff'; ctx.font = 'bold 80px Trebuchet MS'; ctx.fillText(cd > 0.4 ? Math.ceil(cd - .4) || 'GO!' : 'GO!', 360, 160); }
       ctx.textBaseline = 'alphabetic';
       const st = standings(), pos = st.findIndex(s => s.me) + 1;
