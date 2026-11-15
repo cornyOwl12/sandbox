@@ -277,6 +277,8 @@
   .dtool.on { background: #8fd3ff; box-shadow: 0 3px 0 var(--ink), inset 0 0 0 2px #1f5fbf; }
   .stadium { background: repeating-linear-gradient(90deg, #3f9a45 0 18px, #47a84d 18px 36px); border-color: #fff; }
   .archery { background: repeating-linear-gradient(45deg, #ffd1e8 0 12px, #fbe4ef 12px 24px); border-color: #d6338a; }
+  .uniportal { background: linear-gradient(135deg, #ff9a9a, #ffd59a, #fff59a, #a8f0a0, #9ad0ff, #c8a8ff); border-color: #fff; box-shadow: 0 0 16px #fff8, 0 6px 0 rgba(0,0,0,.12); animation: glow 2s ease-in-out infinite; }
+  @keyframes glow { 50% { box-shadow: 0 0 28px #fffc, 0 6px 0 rgba(0,0,0,.12); } }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -2732,6 +2734,13 @@ add(`<div class="paddock archery" data-key="archery" style="left:438px;top:132px
   <span class="play-tag" style="bottom:-12px">🎮 Perfume Panic</span>
 </div>`);
 
+// portal to Unicorn Run (its own 3D page)
+add(`<div class="paddock uniportal" data-key="unicorn" title="Unicorn Run: a 3D game you control with your body!" style="left:800px;top:138px;width:72px;height:67px">
+  <span class="sign" style="top:-16px">🦄 Unicorn Run</span>
+  <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);font-size:34px">🦄</span>
+  <span class="play-tag" style="bottom:-12px">📷 3D body game</span>
+</div>`);
+
 // horse paddock (part of the stables)
 add(`<div class="paddock" data-key="stable" style="left:226px;top:240px;width:180px;height:146px">
   <span class="sign" style="top:-16px">🐎 Paddock</span>
@@ -2803,6 +2812,7 @@ function zoomRect(el) {
   return `translate(${or.left + or.width / 2 - (pr.left + pr.width / 2)}px, ${or.top + or.height / 2 - (pr.top + pr.height / 2)}px) scale(${Math.max(.04, or.width / pr.width)})`;
 }
 function openGame(key) {
+  if (key === 'unicorn') { location.href = 'unicorn.html'; return; }
   closeGame(false);
   const g = games[key];
   $('#mtitle').textContent = g.title;
