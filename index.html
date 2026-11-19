@@ -277,13 +277,6 @@
   .dtool.on { background: #8fd3ff; box-shadow: 0 3px 0 var(--ink), inset 0 0 0 2px #1f5fbf; }
   .stadium { background: repeating-linear-gradient(90deg, #3f9a45 0 18px, #47a84d 18px 36px); border-color: #fff; }
   .archery { background: repeating-linear-gradient(45deg, #ffd1e8 0 12px, #fbe4ef 12px 24px); border-color: #d6338a; }
-  .uniportal { background: linear-gradient(135deg, #ff9a9a, #ffd59a, #fff59a, #a8f0a0, #9ad0ff, #c8a8ff); border-color: #fff; box-shadow: 0 0 16px #fff8, 0 6px 0 rgba(0,0,0,.12); animation: glow 2s ease-in-out infinite; }
-  @keyframes glow { 50% { box-shadow: 0 0 28px #fffc, 0 6px 0 rgba(0,0,0,.12); } }
-  .ul-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .ul-card { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; text-decoration: none; color: var(--ink); background: linear-gradient(160deg, #fff, #ffe9f6); border: 3px solid var(--ink); border-radius: 16px; padding: 14px 10px; box-shadow: 0 5px 0 var(--ink); transition: transform .12s; }
-  .ul-card:hover { transform: translateY(-4px) rotate(-1deg); }
-  .ul-card span { font-size: 44px; } .ul-card b { font-size: 1.15rem; } .ul-card small { font-size: .8rem; opacity: .8; }
-  @media (max-width: 520px) { .ul-grid { grid-template-columns: 1fr; } }
   /* nails */
   .client { display: flex; gap: 12px; align-items: center; justify-content: center; }
   .client-face { font-size: 60px; }
@@ -2428,16 +2421,6 @@ const games = {
     return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', kd); };
   }},
 
-  /* 🦄 Unicorn Land: chooser for the camera games */
-  unicorn: { title: '🦄 Unicorn Land', start(el) {
-    el.innerHTML = `<p class="hint">Two magical games you play with your <b>whole body</b> in front of the camera (keyboard or mouse work too). Pick one!</p>
-      <div class="ul-grid">
-        <a class="ul-card" href="unicorn.html"><span>🦄🌲</span><b>Unicorn Run</b><small>3D! Run in place, dodge trees, jump logs. 3 bumps and you're out.</small></a>
-        <a class="ul-card" href="unicorn-party.html"><span>🧁🌈</span><b>Cupcake Party</b><small>Up to 4 players turn into unicorns and scoop raining cupcakes into their mouths. Never ends!</small></a>
-      </div>
-      <p class="hint" style="margin-top:10px;font-size:.85rem">📷 The camera video stays on your computer. Nothing is uploaded.</p>`;
-  }},
-
   /* 🚲 Mount Wobblemore: Getting-Over-It on a tricycle */
   mountain: { title: '🚲 Mount Wobblemore: Trike Climb', start(el) {
     el.innerHTML = `<p class="hint">Help the cheese 🧀 ride the tricycle to the summit flag. <b>A / D</b> pedal backward / forward, <b>Space</b> jumps. In the air, A / D tilt the trike. <b>Mechanic move:</b> click and drag backward like a slingshot, then let go to <b>FLING</b> the trike (when it's on the ground). Steep walls need a running start. No checkpoints. Good luck. 😇</p>
@@ -2747,13 +2730,6 @@ add(`<div class="paddock archery" data-key="archery" style="left:438px;top:132px
   <span style="position:absolute;left:62px;top:24px;font-size:22px">🏹</span>
   <span style="position:absolute;right:16px;top:20px;font-size:26px">🧴</span>
   <span class="play-tag" style="bottom:-12px">🎮 Perfume Panic</span>
-</div>`);
-
-// portal to Unicorn Run (its own 3D page)
-add(`<div class="paddock uniportal" data-key="unicorn" title="Unicorn Land: camera games you play with your body!" style="left:800px;top:138px;width:72px;height:67px">
-  <span class="sign" style="top:-16px">🦄 Unicorn Land</span>
-  <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);font-size:34px">🦄</span>
-  <span class="play-tag" style="bottom:-12px">📷 Camera games</span>
 </div>`);
 
 // horse paddock (part of the stables)
