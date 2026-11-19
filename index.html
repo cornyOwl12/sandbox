@@ -1014,7 +1014,22 @@ const games = {
     const things = ['🧦', '🧤', '🧣', '🩴', '👟', '🕶️', '🥾', '🩳'];
     el.innerHTML = `<p class="hint">Everything here lost its partner! Flip two at a time to reunite the pairs.</p>
       <div class="stats"><span id="mv">Flips: 0</span><span id="pr">Pairs: 0/8</span></div>
-      <div class="memgrid" id="mg"></div><p class="msg" id="mmsg"></p>`;
+      <div class="memgrid" id="mg"></div><p class="msg" id="mmsg"></p>
+      <h3 style="margin:14px 0 6px">👕 Lost &amp; Found Wardrobe: click a skin to wear it</h3>
+      <p class="hint" style="margin:0 0 6px;font-size:.85rem">Win new skins at the Lucky Clover Casino 🍀, then change into them here.</p>
+      <div class="wardrobe" id="sward"></div>`;
+    function renderWard() {
+      $('#sward', el).innerHTML = SKINS.map(s => {
+        const own = save.skins.includes(s.e);
+        return `<button class="skin ${s.r}${own ? '' : ' unowned'}${save.skin === s.e ? ' on' : ''}" data-e="${s.e}" ${own ? '' : 'disabled'} title="${own ? s.n : '???'}">
+          <span>${own ? s.e : '❓'}</span><small>${own ? s.n : s.r}</small></button>`;
+      }).join('');
+    }
+    $('#sward', el).addEventListener('click', e => {
+      const b = e.target.closest('.skin'); if (!b || b.disabled) return;
+      save.skin = b.dataset.e; persist(); renderWard();
+    });
+    renderWard();
     let first, lock, moves, pairs, to;
     function begin() {
       first = null; lock = false; moves = 0; pairs = 0;
