@@ -23,7 +23,7 @@ A silly little town. Walk around with the arrow keys or WASD, click the sky for 
 | 🏈 Teacup Stadium | Tea-Down Toss: slingshot a football into a giant teacup |
 | 🏹 Fancy Archery | Perfume Panic: stick arrows in a spinning target without draining the leaky perfume bottle |
 | 🥄 Spoon Orchard | Spoon Harvest: pick ripe spoons, grab golden ones, avoid the forks |
-| 🏦 Secret bank | Find the hidden 🧱 in Penny Press, bring Granny's 💣, blow the vault, get ∞ casino coins |
+| 🏦 Secret bank | Find the hidden 🧱 in Penny Press, bring Granny's 💣, blow the vault, grab 265,000 casino coins |
 | 🎰 Lucky Clover Casino | Locked until you find the key. Spend coins (from pennies you stamp at The Penny House) on skin slots, then pick a skin in the wardrobe |
 
 Everything lives in a single `index.html`. GitHub Pages serves it straight from the `main` branch.

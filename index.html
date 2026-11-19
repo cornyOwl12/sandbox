@@ -383,8 +383,13 @@ const SKINS = [
   { e: '👻', n: 'Ghost', r: 'legendary' }, { e: '🦄', n: 'Unicorn', r: 'legendary' }, { e: '🧟', n: 'Zombie', r: 'legendary' },
 ];
 const save = (() => {
-  const d = { coins: 0, key: false, bomb: false, unlimited: false, skins: ['🧒'], skin: '🧒' };
-  try { return Object.assign(d, JSON.parse(localStorage.getItem('tulipPIE') || '{}')); } catch (e) { return d; }
+  const d = { coins: 0, key: false, bomb: false, robbed: false, skins: ['🧒'], skin: '🧒' };
+  try {
+    const o = Object.assign(d, JSON.parse(localStorage.getItem('tulipPIE') || '{}'));
+    // old saves: the vault heist used to give infinite coins; now it is 265,000
+    if (o.unlimited) { o.coins += 265000; o.robbed = true; } delete o.unlimited;
+    return o;
+  } catch (e) { return d; }
 })();
 document.addEventListener('click', e => {
   const b = e.target.closest('#resetBtn'); if (!b) return;
@@ -400,7 +405,7 @@ document.addEventListener('click', e => {
 function persist() { try { localStorage.setItem('tulipPIE', JSON.stringify(save)); } catch (e) {} updateHud(); }
 function updateHud() {
   const hud = document.getElementById('hud');
-  if (hud) hud.innerHTML = `<span>🪙 ${save.unlimited ? '∞' : save.coins}</span><span>${save.key ? '🔑 Key found' : '🔑 ???'}</span>${save.bomb ? '<span>💣</span>' : ''}<span>${save.skin}</span><button id="resetBtn" title="Start the whole game over">🔄 Reset</button>`;
+  if (hud) hud.innerHTML = `<span>🪙 ${save.coins.toLocaleString()}</span><span>${save.key ? '🔑 Key found' : '🔑 ???'}</span>${save.bomb ? '<span>💣</span>' : ''}<span>${save.skin}</span><button id="resetBtn" title="Start the whole game over">🔄 Reset</button>`;
   const p = document.getElementById('player'); if (p) p.textContent = save.skin;
   const cas = document.querySelector('[data-key="casino"]');
   if (cas) {
@@ -1105,7 +1110,7 @@ const games = {
     let blanks, made, left, spawnT, speed, press, raf, last, over, pops;
     function reset() { blanks = []; made = 0; left = 25; spawnT = 0; speed = 110; press = 0; over = false; pops = []; last = performance.now(); $('#pmsg', el).textContent = ''; }
     // every penny you make is yours to keep (and spend at the casino)
-    function earn() { if (!save.unlimited) { save.coins++; persist(); } }
+    function earn() { save.coins++; persist(); }
     function stamp() {
       if (over) { reset(); return; }
       if (press > 0) return;
@@ -1350,8 +1355,8 @@ const games = {
     // ---- the furnace cutscene (Granny's 6th catch) ----
     let cut = null;
     function startFurnace() {
-      const had = save.unlimited ? '∞' : save.coins;
-      save.coins = 0; save.unlimited = false; save.shoos = 0; persist();
+      const had = save.coins.toLocaleString();
+      save.coins = 0; save.robbed = false; save.shoos = 0; persist();
       cut = { t: 0, had, done: false }; showKp && kpOpen && showKp(false);
     }
     c.addEventListener('pointerdown', () => { if (cut && cut.done) endFurnace(); }, true);
@@ -1461,7 +1466,7 @@ const games = {
         else { granny.x += ddx / d * 60 * dt; granny.y += ddy / d * 60 * dt; }
       }
       if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('#zmsg', el).textContent = ''; }
-      if (!save.bomb && !save.unlimited && Math.hypot(player.x - 602, player.y - 40) < 24) {
+      if (!save.bomb && !save.robbed && Math.hypot(player.x - 602, player.y - 40) < 24) {
         save.bomb = true; persist();
         $('#zmsg', el).textContent = '💣 You swiped Granny\'s emergency cartoon bomb! Somebody, somewhere, has a vault that needs opening… (psst: the Penny House)'; msgT = 6;
       }
@@ -1486,7 +1491,7 @@ const games = {
       decor.forEach(([e, x, y, s]) => s && emoji(e, x, y, s));
       ctx.fillStyle = '#5a5a66'; ctx.fillRect(588, 160, 34, 40); ctx.fillStyle = `rgba(255,${130 + Math.sin(t / 90) * 40},40,.9)`; ctx.fillRect(593, 176, 24, 18); emoji('🔥', 605, 186, 14);
       emoji('🦆', 318, 64, 16);
-      if (!save.bomb && !save.unlimited) { ctx.save(); ctx.shadowColor = '#ff5a3a'; ctx.shadowBlur = 10 + Math.sin(t / 180) * 6; emoji('💣', 602, 40, 22); ctx.restore(); }
+      if (!save.bomb && !save.robbed) { ctx.save(); ctx.shadowColor = '#ff5a3a'; ctx.shadowBlur = 10 + Math.sin(t / 180) * 6; emoji('💣', 602, 40, 22); ctx.restore(); }
       if (!save.key) { ctx.save(); ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 12 + Math.sin(t / 200) * 6; emoji('🔑', 762, 222, 22); ctx.restore(); }
       // rocking chair rock
       const sprites = [...zs.map(z => ({ ...z, kind: 'z' })), { ...granny, kind: 'g' }, { ...player, kind: 'p' }].sort((a, b) => a.y - b.y);
@@ -1612,9 +1617,9 @@ const games = {
         return `<button class="skin ${s.r}${own ? '' : ' unowned'}${save.skin === s.e ? ' on' : ''}" data-e="${s.e}" ${own ? '' : 'disabled'} title="${own ? s.n : '???'}">
           <span>${own ? s.e : '❓'}</span><small>${own ? s.n : s.r}</small></button>`;
       }).join('');
-      $('#scoins', el).textContent = save.unlimited ? '🪙 ∞ coins (bank heist money 😎)' : `🪙 ${save.coins} coins`;
+      $('#scoins', el).textContent = `🪙 ${save.coins.toLocaleString()} coins`;
       $('#sowned', el).textContent = `Skins: ${save.skins.length}/${SKINS.length}`;
-      $('#spin', el).disabled = spinning || (!save.unlimited && save.coins < 1);
+      $('#spin', el).disabled = spinning || save.coins < 1;
     }
     $('#ward', el).addEventListener('click', e => {
       const b = e.target.closest('.skin'); if (!b || b.disabled) return;
@@ -1627,8 +1632,8 @@ const games = {
       return pool[0];
     }
     $('#spin', el).addEventListener('click', () => {
-      if (spinning || (!save.unlimited && save.coins < 1)) return;
-      if (!save.unlimited) save.coins--; persist(); spinning = true; renderWard();
+      if (spinning || save.coins < 1) return;
+      save.coins--; persist(); spinning = true; renderWard();
       $('#smsg', el).textContent = '🎶 Spinning…';
       const roll = Math.random();
       let final, outcome, prize = null;
@@ -1983,9 +1988,9 @@ const games = {
       <p class="msg" id="bmsg"></p><div class="row" id="bbtns"></div>`;
     const msg = $('#bmsg', el), btns = $('#bbtns', el), vault = $('#vault', el);
     let timers = [];
-    if (save.unlimited) {
+    if (save.robbed) {
       vault.classList.add('blown');
-      msg.innerHTML = 'The vault is completely empty. You already took ALL the pennies. 😎<br>You have <b>∞ coins</b> at the Lucky Clover Casino.';
+      msg.innerHTML = 'The vault is completely empty. You already took ALL 265,000 pennies. 😎<br>Spend them at the Lucky Clover Casino!';
       return;
     }
     if (!save.bomb) {
@@ -2016,9 +2021,9 @@ const games = {
           msg.innerHTML = 'The vault is OPEN! Mountains of pennies everywhere! 🤑';
           btns.innerHTML = '<button class="btn big" id="grab">💰 Stuff your pockets with ALL the pennies</button>';
           $('#grab', el).addEventListener('click', () => {
-            save.unlimited = true; save.bomb = false; persist();
+            save.coins += 265000; save.robbed = true; save.bomb = false; persist();
             btns.innerHTML = '';
-            msg.innerHTML = '🤑 You grabbed EVERY. SINGLE. PENNY.<br>You now have <b>∞ coins</b>. Go spin to your heart\'s content at the <b>Lucky Clover Casino</b>! 🍀🎰';
+            msg.innerHTML = '🤑 You grabbed EVERY. SINGLE. PENNY.<br>That\'s <b>265,000 coins</b>! Go spin to your heart\'s content at the <b>Lucky Clover Casino</b>! 🍀🎰';
           });
         }, 2200));
       }, 900);
